@@ -91,6 +91,9 @@ export async function startSession(
       body: JSON.stringify(request),
     });
     if (response.status === 403) throw new SessionStartError("Sessions aren't open to your account yet.");
+    if (response.status === 422) {
+      throw new SessionStartError("That Topic can't be used. Please choose another Topic. Your other choices are kept.");
+    }
     if (!response.ok) throw new SessionStartError(`Couldn't start the Session (${response.status}).`);
     const created = CreateSessionResponse.parse(await response.json());
     await pc.setRemoteDescription({ type: "answer", sdp: created.sdpAnswer });

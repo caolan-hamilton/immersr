@@ -29,11 +29,14 @@ export type Level = z.infer<typeof Level>;
 
 export const TOPIC_MAX_LENGTH = 150;
 
+/** Trims and cuts a Topic to TOPIC_MAX_LENGTH characters (whole characters, never half an emoji). */
+export const cutTopic = (topic: string): string => Array.from(topic.trim()).slice(0, TOPIC_MAX_LENGTH).join("").trim();
+
 export const CreateSessionRequest = z.object({
   sdpOffer: z.string().min(1),
   language: Language,
   level: Level,
-  topic: z.string().trim().min(1).max(TOPIC_MAX_LENGTH),
+  topic: z.string().transform(cutTopic).pipe(z.string().min(1)),
 });
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequest>;
 
