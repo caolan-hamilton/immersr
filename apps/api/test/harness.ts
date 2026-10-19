@@ -15,6 +15,8 @@ const client = new DynamoDBClient({
   credentials: { accessKeyId: "local", secretAccessKey: "local" },
 });
 const db = DynamoDBDocumentClient.from(client, { marshallOptions: { removeUndefinedValues: true } });
+/** For arranging table contents in tests. */
+export const testDb = db;
 
 /** Creates a fresh table with the production key design; call `drop` in afterAll. */
 export async function createTestTable() {

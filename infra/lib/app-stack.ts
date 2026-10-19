@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from "aws-cdk-lib";
 import * as apigw from "aws-cdk-lib/aws-apigatewayv2";
+import { HttpJwtAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
@@ -12,6 +13,8 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import type { Construct } from "constructs";
 import { TABLE } from "@immersr/api/table";
+import type { WebConfig } from "@immersr/shared";
+import { Auth } from "./auth.ts";
 
 const path = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -51,6 +54,9 @@ export class AppStack extends Stack {
 
     const healthFn = fn("HealthFn", "health.ts");
     table.grantReadData(healthFn);
+
+    const meFn = fn("MeFn", "me.ts");
+    table.grantReadData(meFn);
 
     const api = new apigw.HttpApi(this, "Api", { createDefaultStage: true });
     api.addRoutes({
@@ -100,8 +106,32 @@ export class AppStack extends Stack {
       },
     });
 
+    const { userPool, userPoolClient, userPoolDomain } = new Auth(this, "Auth", {
+      stage: props.stage,
+      isProd,
+      siteUrl: `https://${distribution.distributionDomainName}`,
+    });
+
+    const authorizer = new HttpJwtAuthorizer("Jwt", userPool.userPoolProviderUrl, {
+      jwtAudience: [userPoolClient.userPoolClientId],
+    });
+    api.addRoutes({
+      path: "/api/me",
+      methods: [apigw.HttpMethod.GET],
+      integration: new HttpLambdaIntegration("MeIntegration", meFn),
+      authorizer,
+    });
+
+    const webConfig: WebConfig = {
+      cognitoDomain: userPoolDomain.baseUrl(),
+      clientId: userPoolClient.userPoolClientId,
+    };
+
     new s3deploy.BucketDeployment(this, "DeploySite", {
-      sources: [s3deploy.Source.asset(path("../../apps/web/dist"))],
+      sources: [
+        s3deploy.Source.asset(path("../../apps/web/dist")),
+        s3deploy.Source.jsonData("config.json", webConfig),
+      ],
       destinationBucket: site,
       distribution,
       distributionPaths: ["/*"],

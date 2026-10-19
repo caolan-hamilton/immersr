@@ -6,3 +6,4 @@ cdk.out/
 dist/
 .vite/
 coverage/
+apps/web/public/config.json

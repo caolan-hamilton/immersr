@@ -1,0 +1,50 @@
+import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
+import type { MeResponse } from "@immersr/shared";
+import type { Deps } from "../lib/deps.ts";
+import { json } from "../lib/http.ts";
+import { callerOf, DAILY_ALLOWANCE_SECONDS, nextUtcMidnight, usageDay } from "../lib/learner.ts";
+import { TABLE } from "../lib/table.ts";
+
+const IMMERSION_PREFIX = "IMMERSION#";
+
+// GET /api/me: today's Daily allowance and the Learner's Immersion time per Target language.
+export const me =
+  (deps: Deps) =>
+  async (event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyStructuredResultV2> => {
+    const { sub, isAdmin } = callerOf(event);
+    const now = deps.world.clock.now();
+    const pk = `LEARNER#${sub}`;
+
+    const [usage, immersionItems] = await Promise.all([
+      deps.db.send(
+        new GetCommand({
+          TableName: deps.tableName,
+          Key: { [TABLE.partitionKey]: pk, [TABLE.sortKey]: `USAGE#${usageDay(now)}` },
+        }),
+      ),
+      deps.db.send(
+        new QueryCommand({
+          TableName: deps.tableName,
+          KeyConditionExpression: "#pk = :pk AND begins_with(#sk, :prefix)",
+          ExpressionAttributeNames: { "#pk": TABLE.partitionKey, "#sk": TABLE.sortKey },
+          ExpressionAttributeValues: { ":pk": pk, ":prefix": IMMERSION_PREFIX },
+        }),
+      ),
+    ]);
+
+    const body: MeResponse = {
+      allowance: {
+        usedSeconds: usage.Item?.reservedSeconds ?? 0,
+        limitSeconds: isAdmin ? DAILY_ALLOWANCE_SECONDS.admin : DAILY_ALLOWANCE_SECONDS.learner,
+        resetsAt: nextUtcMidnight(now).toISOString(),
+      },
+      immersion: Object.fromEntries(
+        (immersionItems.Items ?? []).map((item) => [
+          String(item[TABLE.sortKey]).slice(IMMERSION_PREFIX.length),
+          item.partnerSeconds ?? 0,
+        ]),
+      ),
+    };
+    return json(200, body);
+  };
