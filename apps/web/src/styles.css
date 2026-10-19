@@ -42,3 +42,10 @@ main {
 .dot.bad {
   background: var(--bad);
 }
+.transcript {
+  list-style: none;
+  padding: 0;
+}
+.transcript li {
+  margin: 8px 0;
+}

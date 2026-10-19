@@ -6,12 +6,14 @@ import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import type { Construct } from "constructs";
+import { OPENAI_API_KEY_PARAMETER } from "@immersr/api/openai-key";
 import { TABLE } from "@immersr/api/table";
 import type { WebConfig } from "@immersr/shared";
 import { Auth } from "./auth.ts";
@@ -57,6 +59,16 @@ export class AppStack extends Stack {
 
     const meFn = fn("MeFn", "me.ts");
     table.grantReadData(meFn);
+
+    // The OpenAI key is a SecureString the owner creates by hand; the Lambda reads it at runtime only.
+    const sessionsFn = fn("SessionsFn", "sessions.ts");
+    table.grantWriteData(sessionsFn);
+    sessionsFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ssm:GetParameter"],
+        resources: [`arn:${this.partition}:ssm:${this.region}:${this.account}:parameter${OPENAI_API_KEY_PARAMETER}`],
+      }),
+    );
 
     const api = new apigw.HttpApi(this, "Api", { createDefaultStage: true });
     api.addRoutes({
@@ -119,6 +131,13 @@ export class AppStack extends Stack {
       path: "/api/me",
       methods: [apigw.HttpMethod.GET],
       integration: new HttpLambdaIntegration("MeIntegration", meFn),
+      authorizer,
+    });
+
+    api.addRoutes({
+      path: "/api/sessions",
+      methods: [apigw.HttpMethod.POST],
+      integration: new HttpLambdaIntegration("SessionsIntegration", sessionsFn),
       authorizer,
     });
 
