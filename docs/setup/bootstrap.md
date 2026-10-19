@@ -24,7 +24,13 @@ This creates the `cdk-*` roles and asset bucket that every deploy uses.
 npx cdk deploy Immersr-ci
 ```
 
-Note the `DeployRoleArn` output. The role trusts only jobs on `caolan-hamilton/immersr` that run in the GitHub `prod` environment, and it can only assume the CDK bootstrap roles. (A job that names an environment gets an OIDC subject of `repo:<owner>/<repo>:environment:<name>`, not its branch ref.)
+Note the `DeployRoleArn` output. The role trusts only jobs on this repo that run in the GitHub `prod` environment, and it can only assume the CDK bootstrap roles.
+
+The trust is keyed on the OIDC `sub` claim. This repo uses GitHub's **immutable subject** format (`repo:<owner>@<owner id>/<repo>@<repo id>:environment:prod`), so `infra/cdk.json` stores the prefix as `githubOidcSubjectPrefix`. If you recreate the repo or move it, read the new prefix and update that value before deploying:
+
+```sh
+gh api repos/<owner>/<repo>/actions/oidc/customization/sub -q .sub_claim_prefix
+```
 
 > If your account already has a GitHub OIDC provider (`token.actions.githubusercontent.com`), this deploy fails with "already exists". In that case, delete the old provider, or ask for `CiStack` to import the existing one.
 
