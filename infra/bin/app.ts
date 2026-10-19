@@ -15,4 +15,4 @@ new AppStack(app, "Immersr-prod", { env, stage: "prod" });
 const user = (process.env.USER ?? "local").toLowerCase().replace(/[^a-z0-9]/g, "");
 new AppStack(app, `Immersr-dev-${user}`, { env, stage: `dev-${user}` });
 
-new CiStack(app, "Immersr-ci", { env, githubRepo: app.node.getContext("githubRepo") });
+new CiStack(app, "Immersr-ci", { env, githubOidcSubjectPrefix: app.node.getContext("githubOidcSubjectPrefix") });
