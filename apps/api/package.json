@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "drift-check": "node scripts/drift-check.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1152.0",
@@ -16,7 +17,8 @@
     "@aws-sdk/client-ssm": "^3.1152.0",
     "@aws-sdk/client-translate": "^3.1152.0",
     "@aws-sdk/lib-dynamodb": "^3.1152.0",
-    "@immersr/shared": "workspace:*"
+    "@immersr/shared": "workspace:*",
+    "franc-min": "^6.2.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.164",
