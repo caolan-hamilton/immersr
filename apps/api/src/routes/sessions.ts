@@ -93,6 +93,14 @@ export const createSession =
       return failed("Couldn't start the Session. Please try again.", call.callId);
     }
 
+    try {
+      await deps.world.scheduler.scheduleHangup({ sub, sessionId, callId: call.callId }, endsAt);
+    } catch (err) {
+      console.error("Scheduling the hang-up failed; hanging up the call", err);
+      // Without a hang-up nothing would bound this Session, so it doesn't start.
+      return failed("Couldn't start the Session. Please try again.", call.callId);
+    }
+
     const body: CreateSessionResponse = { sessionId, sdpAnswer: call.sdpAnswer, endsAt: endsAt.toISOString() };
     return json(201, body);
   };
