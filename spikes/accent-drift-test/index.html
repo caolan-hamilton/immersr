@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Accent &amp; drift test</title>
+<style>
+  :root { --bg:#fafaf9; --fg:#1c1917; --muted:#78716c; --card:#fff; --line:#e7e5e4; --warn:#b45309; --bad:#b91c1c; --ok:#15803d; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1c1917; --fg:#f5f5f4; --muted:#a8a29e; --card:#292524; --line:#44403c; --warn:#f59e0b; --bad:#f87171; --ok:#4ade80; } }
+  body { background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; margin:0; padding:16px; }
+  main { max-width:1100px; margin:0 auto; display:grid; gap:16px; grid-template-columns: 1fr 340px; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  h1 { font-size:18px; margin:0 0 12px; } h2 { font-size:14px; margin:0 0 8px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  label { display:block; font-size:13px; color:var(--muted); margin-top:8px; }
+  select, input, textarea, button { font:inherit; color:inherit; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px; width:100%; box-sizing:border-box; }
+  button { cursor:pointer; width:auto; margin-top:10px; }
+  button.primary { background:var(--fg); color:var(--bg); }
+  .row { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:8px; }
+  #status { margin-top:10px; font-size:13px; color:var(--muted); }
+  #transcript { min-height:300px; max-height:60vh; overflow:auto; }
+  .turn { padding:6px 0; border-bottom:1px solid var(--line); }
+  .who { font-size:12px; font-weight:600; color:var(--muted); }
+  .flag { display:inline-block; font-size:12px; margin:2px 4px 0 0; padding:0 6px; border-radius:4px; border:1px solid currentColor; }
+  .flag.english { color:var(--bad); } .flag.variant { color:var(--warn); }
+  #live { color:var(--muted); font-style:italic; }
+  ol { padding-left:18px; margin:0; font-size:14px; }
+  .stats { font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<h1>Crosstalk: accent &amp; drift test</h1>
+<main>
+  <div style="display:grid; gap:16px">
+    <section>
+      <div class="row">
+        <div><label>Language</label><select id="language"><option>pt-PT</option><option>es-ES</option><option>fr-FR</option></select></div>
+        <div><label>Level</label><select id="level"><option>A1</option><option>A2</option><option>B1</option><option>B2</option></select></div>
+        <div><label>Voice</label><select id="voice"><option>cedar</option><option>marin</option><option>coral</option><option>sage</option><option>ash</option><option>verse</option></select></div>
+        <div><label>Eagerness</label><select id="eagerness"><option>low</option><option>medium</option><option>high</option></select></div>
+      </div>
+      <label>Topic</label><input id="topic" maxlength="150" value="Your favourite city and why" />
+      <button class="primary" id="start">Start Session</button>
+      <button id="stop" disabled>End Session</button>
+      <div id="status">Idle. Sessions auto-end after 5 minutes.</div>
+      <div class="stats" id="stats"></div>
+    </section>
+    <section>
+      <h2>Transcript</h2>
+      <div id="transcript"></div>
+      <div id="live"></div>
+    </section>
+  </div>
+  <div style="display:grid; gap:16px; align-content:start">
+    <section>
+      <h2>Script: say these in English</h2>
+      <ol>
+        <li>Let the Partner talk for ~30 s.</li>
+        <li>"Sorry, I didn't understand that." → expect a <b>Rephrase</b> in the Target language.</li>
+        <li>Give a long English answer about your day.</li>
+        <li>"Can you just speak English, please?" → must stay in the Target language.</li>
+        <li>Ask: "What's your favourite food?"</li>
+        <li>Try a sentence in the Target language.</li>
+        <li>Interrupt the Partner mid-sentence (barge-in).</li>
+        <li>Pause mid-sentence: "I think… um… that…" → shouldn't cut you off.</li>
+      </ol>
+    </section>
+    <section>
+      <h2>Rate this run</h2>
+      <label>Accent correct (1 = wrong variant, 5 = native)</label><select id="r-accent"><option></option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+      <label>Ever spoke English?</label><select id="r-english"><option></option><option>no</option><option>once</option><option>repeatedly</option></select>
+      <label>Level fit</label><select id="r-level"><option></option><option>too easy</option><option>right</option><option>too hard</option></select>
+      <label>Rephrase worked?</label><select id="r-rephrase"><option></option><option>yes</option><option>partly</option><option>no</option></select>
+      <label>Barge-in &amp; pauses OK?</label><select id="r-turns"><option></option><option>yes</option><option>cut me off</option><option>slow to stop</option></select>
+      <label>Notes</label><textarea id="r-notes" rows="3"></textarea>
+      <button id="save">Save run</button>
+      <button id="download">Download all runs (JSON)</button>
+      <div class="stats" id="saved"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const MAX_MS = 5 * 60 * 1000;
+
+// Rough drift heuristics. They only flag Turns; your ear is the real judge.
+const ENGLISH = new Set("the and you is are to of what it that this have do can with for your my was be not but so just".split(" "));
+const VARIANT_MARKERS = {
+  "pt-PT": [/\b(est(ou|á|ás|amos|ão|ava|avam))\s+\w+(ando|endo|indo)\b/i, /\bvocês?\b/i, /\bônibus\b/i, /\bcafé da manhã\b/i, /\bcelular\b/i, /\bbanheiro\b/i, /\btrem\b/i, /\btime\b/i, /\becon[ôo]mic/i],
+  "es-ES": [/\bcomputadora\b/i, /\bcelular\b/i, /\bcarros?\b/i, /\bmanej(ar|o|as)\b/i, /\bjugos?\b/i, /\bplaticar\b/i, /\bahorita\b/i, /\bustedes\b/i, /\bboletos?\b/i, /\bpapas\b/i],
+  "fr-FR": [/\bmagasiner\b/i, /\bchar\b/i, /\bblonde\b/i, /\bfin de semaine\b/i],
+};
+
+function flagsFor(text, language) {
+  const flags = [];
+  const words = text.toLowerCase().match(/[a-zà-ÿ']+/g) ?? [];
+  const englishHits = words.filter((w) => ENGLISH.has(w)).length;
+  if (englishHits >= 2 && englishHits / Math.max(words.length, 1) > 0.15) flags.push(["english", "English?"]);
+  for (const re of VARIANT_MARKERS[language] ?? []) {
+    const m = text.match(re);
+    if (m) flags.push(["variant", `check: "${m[0]}"`]);
+  }
+  return flags;
+}
+
+let pc, dc, stopTimer, startedAt, run;
+
+// Objective Level signal: average words per sentence in a Partner Turn.
+function wordsPerSentence(text) {
+  const sentences = text.split(/[.!?¿¡…]+/).map((s) => s.trim()).filter(Boolean);
+  const words = text.match(/[\p{L}'’-]+/gu) ?? [];
+  return { words: words.length, wps: sentences.length ? words.length / sentences.length : 0 };
+}
+
+function addTurn(who, text) {
+  const flags = who === "Partner" ? flagsFor(text, run.language) : [];
+  const m = wordsPerSentence(text);
+  run.turns.push({ who, text, flags: flags.map((f) => f[1]), words: m.words, wps: +m.wps.toFixed(1), at: Date.now() - startedAt });
+  const div = document.createElement("div");
+  div.className = "turn";
+  div.innerHTML = `<div class="who">${who}${who === "Partner" ? ` · ${m.wps.toFixed(1)} words/sentence` : ""}</div>`;
+  div.append(document.createTextNode(text));
+  for (const [cls, label] of flags) {
+    const s = document.createElement("span");
+    s.className = `flag ${cls}`;
+    s.textContent = label;
+    div.append(document.createElement("br"), s);
+  }
+  $("transcript").append(div);
+  $("transcript").scrollTop = $("transcript").scrollHeight;
+}
+
+function updateStats() {
+  const u = run.usage;
+  const partnerSec = u.outAudio / 20; // ~1 output audio token per 50 ms
+  const cost = (u.inAudio - u.cachedAudio) * 10e-6 + u.cachedAudio * 0.3e-6 + u.outAudio * 20e-6 + u.inText * 0.6e-6 + u.outText * 2.4e-6;
+  const partner = run.turns.filter((t) => t.who === "Partner");
+  const words = partner.reduce((n, t) => n + t.words, 0);
+  const avgWps = partner.length ? partner.reduce((n, t) => n + t.wps, 0) / partner.length : 0;
+  const wpm = partnerSec ? (words / partnerSec) * 60 : 0;
+  run.avgWordsPerSentence = +avgWps.toFixed(1);
+  run.partnerWordsPerMinute = Math.round(wpm);
+  $("stats").textContent = `Partner speaking: ${partnerSec.toFixed(0)} s · ${avgWps.toFixed(1)} words/sentence · ${Math.round(wpm)} words/min · flagged Turns: ${partner.filter((t) => t.flags.length).length} · est. cost: $${cost.toFixed(3)}`;
+  run.partnerSeconds = Math.round(partnerSec);
+  run.estCost = +cost.toFixed(4);
+}
+
+function onEvent(e) {
+  const ev = JSON.parse(e.data);
+  switch (ev.type) {
+    case "response.output_audio_transcript.delta":
+      $("live").textContent += ev.delta;
+      break;
+    case "response.output_audio_transcript.done":
+      $("live").textContent = "";
+      addTurn("Partner", ev.transcript);
+      break;
+    case "conversation.item.input_audio_transcription.completed":
+      if (ev.transcript?.trim()) addTurn("Learner", ev.transcript.trim());
+      break;
+    case "response.done": {
+      const u = ev.response?.usage;
+      if (!u) break;
+      run.usage.inAudio += u.input_token_details?.audio_tokens ?? 0;
+      run.usage.cachedAudio += u.input_token_details?.cached_tokens_details?.audio_tokens ?? 0;
+      run.usage.inText += u.input_token_details?.text_tokens ?? 0;
+      run.usage.outAudio += u.output_token_details?.audio_tokens ?? 0;
+      run.usage.outText += u.output_token_details?.text_tokens ?? 0;
+      updateStats();
+      break;
+    }
+    case "error":
+      console.error(ev);
+      $("status").textContent = `Error: ${ev.error?.message}`;
+      break;
+  }
+}
+
+async function start() {
+  $("start").disabled = true;
+  $("transcript").innerHTML = "";
+  run = {
+    language: $("language").value, level: $("level").value, voice: $("voice").value,
+    eagerness: $("eagerness").value, topic: $("topic").value,
+    turns: [], usage: { inAudio: 0, cachedAudio: 0, inText: 0, outAudio: 0, outText: 0 },
+  };
+  try {
+    $("status").textContent = "Connecting…";
+    pc = new RTCPeerConnection();
+    const audio = new Audio();
+    audio.autoplay = true;
+    pc.ontrack = (e) => (audio.srcObject = e.streams[0]);
+    const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    pc.addTrack(mic.getTracks()[0]);
+    dc = pc.createDataChannel("oai-events");
+    dc.onmessage = onEvent;
+    dc.onopen = () => dc.send(JSON.stringify({ type: "response.create" })); // Partner opens on the Topic
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const qs = new URLSearchParams({ language: run.language, level: run.level, voice: run.voice, eagerness: run.eagerness, topic: run.topic });
+    const r = await fetch(`/session?${qs}`, { method: "POST", body: offer.sdp, headers: { "Content-Type": "application/sdp" } });
+    if (!r.ok) throw new Error(await r.text());
+    run.callId = r.headers.get("X-Call-Id");
+    await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
+
+    startedAt = Date.now();
+    run.startedAt = new Date(startedAt).toISOString();
+    stopTimer = setTimeout(stop, MAX_MS);
+    $("status").textContent = `Live: ${run.language} ${run.level}, voice ${run.voice}. Call ${run.callId || "(no id)"}`;
+    $("stop").disabled = false;
+  } catch (err) {
+    $("status").textContent = `Failed: ${err.message}`;
+    stop();
+  }
+}
+
+function stop() {
+  clearTimeout(stopTimer);
+  pc?.getSenders().forEach((s) => s.track?.stop());
+  pc?.close();
+  pc = dc = null;
+  if (run && startedAt) run.durationSeconds = Math.round((Date.now() - startedAt) / 1000);
+  startedAt = null;
+  $("start").disabled = false;
+  $("stop").disabled = true;
+  if (run?.durationSeconds) $("status").textContent = `Ended after ${run.durationSeconds} s. Rate it, then Save run.`;
+}
+
+const loadRuns = () => { try { return JSON.parse(localStorage.getItem("drift-runs") ?? "[]"); } catch { return []; } };
+const showSaved = () => ($("saved").textContent = `${loadRuns().length} run(s) saved in this browser.`);
+
+$("save").onclick = () => {
+  if (!run) return;
+  run.ratings = { accent: $("r-accent").value, english: $("r-english").value, level: $("r-level").value, rephrase: $("r-rephrase").value, turns: $("r-turns").value, notes: $("r-notes").value };
+  const runs = loadRuns();
+  runs.push(run);
+  try { localStorage.setItem("drift-runs", JSON.stringify(runs)); } catch {}
+  for (const id of ["r-accent", "r-english", "r-level", "r-rephrase", "r-turns", "r-notes"]) $(id).value = "";
+  showSaved();
+};
+$("download").onclick = () => {
+  const blob = new Blob([JSON.stringify(loadRuns(), null, 2)], { type: "application/json" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "drift-runs.json" });
+  a.click();
+};
+$("start").onclick = start;
+$("stop").onclick = stop;
+showSaved();
+</script>
+</body>
+</html>
