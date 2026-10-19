@@ -1,0 +1,17 @@
+{
+  "name": "immersr",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "build:web": "pnpm --filter @immersr/web build",
+    "db:local": "docker run --rm -d --name immersr-dynamodb -p 8000:8000 amazon/dynamodb-local:latest -jar DynamoDBLocal.jar -inMemory -sharedDb",
+    "db:local:stop": "docker stop immersr-dynamodb",
+    "synth": "pnpm build:web && pnpm --filter @immersr/infra cdk synth",
+    "deploy:dev": "pnpm build:web && pnpm --filter @immersr/infra cdk deploy \"Immersr-dev-*\"",
+    "dev:web": "pnpm --filter @immersr/web dev"
+  }
+}

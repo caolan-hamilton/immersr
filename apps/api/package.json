@@ -1,0 +1,21 @@
+{
+  "name": "@immersr/api",
+  "private": true,
+  "type": "module",
+  "exports": { "./table": "./src/lib/table.ts" },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1152.0",
+    "@aws-sdk/lib-dynamodb": "^3.1152.0",
+    "@immersr/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.164",
+    "@types/node": "^22",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

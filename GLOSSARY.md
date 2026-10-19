@@ -1,4 +1,4 @@
-# Crosstalki
+# Immersr
 
 A language-immersion app: a live AI voice partner speaks only the language you're acquiring, you reply in English, and you build listening time through conversation rather than deliberate study.
 
