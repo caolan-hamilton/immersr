@@ -61,13 +61,26 @@ async function createCall(sdpOffer: string, sessionConfig: unknown) {
   return { sdpAnswer: text, callId };
 }
 
+async function moderate(text: string) {
+  const response = await fetch("https://api.openai.com/v1/moderations", {
+    method: "POST",
+    headers: { authorization: `Bearer ${await openaiApiKey()}`, "content-type": "application/json" },
+    body: JSON.stringify({ model: "omni-moderation-latest", input: text }),
+  });
+  if (!response.ok) throw new Error(`OpenAI moderation failed with ${response.status}: ${await response.text()}`);
+  const result = (await response.json()) as { results?: { flagged?: boolean }[] };
+  const flagged = result.results?.[0]?.flagged;
+  if (typeof flagged !== "boolean") throw new Error("OpenAI moderation response had no verdict");
+  return { flagged };
+}
+
 // Real clients are added by the tickets that first need them.
 export function productionOutsideWorld(): OutsideWorld {
   return {
     openai: {
       createCall,
       hangup: notYetBuilt("openai.hangup", "#5"),
-      moderate: notYetBuilt("openai.moderate", "#7"),
+      moderate,
     },
     scheduler: { scheduleHangup: notYetBuilt("scheduler.scheduleHangup", "#6") },
     translate: { toEnglish: notYetBuilt("translate.toEnglish", "#8") },
