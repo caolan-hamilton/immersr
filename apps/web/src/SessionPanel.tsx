@@ -9,7 +9,7 @@ import {
   type MeResponse,
 } from "@immersr/shared";
 import { formatCountdown, formatDuration, formatTimeOfDay, languageName } from "./format.ts";
-import { deliverPendingEnd, loadPendingEnd, savePendingEnd, type PendingEnd } from "./pending-end.ts";
+import { clearPendingEnd, deliverPendingEnd, loadPendingEnd, savePendingEnd, type PendingEnd } from "./pending-end.ts";
 import {
   MicrophoneBlockedError,
   SessionRefusedError,
@@ -53,13 +53,22 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
   useEffect(() => () => live.current?.end(), []);
 
   // If the tab closes or reloads mid-Session, keep the Session on the device so the next load can End it.
+  // Nothing is saved while the Session is simply live, so a second tab never Ends a Session another tab is running.
   useEffect(() => {
     const keepForRetry = () => {
       const session = live.current;
       if (session) savePendingEnd({ sessionId: session.sessionId, partnerSeconds: session.partnerSeconds() });
     };
+    // A tab restored from the back/forward cache is still live, so its saved entry must not be retried elsewhere.
+    const dropIfStillLive = (event: PageTransitionEvent) => {
+      if (event.persisted && live.current) clearPendingEnd();
+    };
     window.addEventListener("pagehide", keepForRetry);
-    return () => window.removeEventListener("pagehide", keepForRetry);
+    window.addEventListener("pageshow", dropIfStillLive);
+    return () => {
+      window.removeEventListener("pagehide", keepForRetry);
+      window.removeEventListener("pageshow", dropIfStillLive);
+    };
   }, []);
 
   // Closes the connection, then has the server hang up and settle. Safe to call twice (End, countdown, drop).
@@ -163,8 +172,6 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
           },
         },
       );
-      // Saved straight away, so even a crash leaves something to End (with 0 Partner seconds, as the server expects of an unreported Session).
-      savePendingEnd({ sessionId: live.current.sessionId, partnerSeconds: 0 });
       setPhase("live");
     } catch (err) {
       if (err instanceof MicrophoneBlockedError) setMicBlocked(true);
