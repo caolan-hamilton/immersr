@@ -1,5 +1,6 @@
 import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { hangUp } from "../src/routes/hang-up.ts";
 import { deleteMe } from "../src/routes/delete-me.ts";
 import { createSession } from "../src/routes/sessions.ts";
 import { createTestTable, fakeOutsideWorld, httpEvent, parseBody, testDb, testDeps } from "./harness.ts";
@@ -76,6 +77,22 @@ describe("DELETE /api/me", () => {
     expect(fake.recorded.deletedUsers).toEqual(["talker"]);
     // The unused 10 of the 15 reserved minutes went back; the 5 used minutes stay counted globally.
     expect((await item("GLOBAL", "USAGE#2026-10-19"))?.reservedSeconds).toBe(globalBefore - 600);
+  });
+
+  it("leaves nothing behind when the Session's scheduled hang-up fires after the Learner was erased", async () => {
+    const fake = fakeOutsideWorld();
+    await startSession("ghost", fake);
+    expect((await remove("ghost", fake)).statusCode).toBe(204);
+    const globalAfterErasure = (await item("GLOBAL", "USAGE#2026-10-19"))?.reservedSeconds;
+    const hangupsBefore = fake.recorded.hangups.length;
+
+    const schedule = fake.recorded.schedules[0]!;
+    fake.clock.set(schedule.at);
+    await hangUp(testDeps(table.tableName, fake))(schedule.target);
+
+    expect(await partition("LEARNER#ghost")).toEqual([]);
+    expect(fake.recorded.hangups).toHaveLength(hangupsBefore);
+    expect((await item("GLOBAL", "USAGE#2026-10-19"))?.reservedSeconds).toBe(globalAfterErasure);
   });
 
   it("leaves other Learners' items untouched", async () => {
