@@ -40,16 +40,31 @@ export interface LiveSession {
   partnerSeconds(): number;
 }
 
+/** End was refused or couldn't be delivered. `status` is the HTTP status, absent when the request never arrived. */
+export class EndFailedError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
+
 /** Tells the server the Session is over; it hangs up, settles on its own clock and returns the result. */
 export async function reportEnd(sessionId: string, partnerSeconds: number): Promise<EndSessionResponse> {
   const token = await getIdToken();
-  if (!token) throw new Error("You've been signed out. Please sign in again.");
-  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/end`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ partnerSeconds: Math.floor(partnerSeconds) } satisfies EndSessionRequest),
-  });
-  if (!response.ok) throw new Error(`Couldn't end the Session cleanly (${response.status}).`);
+  if (!token) throw new EndFailedError("You've been signed out. Please sign in again.");
+  let response: Response;
+  try {
+    response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/end`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ partnerSeconds: Math.floor(partnerSeconds) } satisfies EndSessionRequest),
+    });
+  } catch {
+    throw new EndFailedError("You appear to be offline.");
+  }
+  if (!response.ok) throw new EndFailedError(`Couldn't end the Session cleanly (${response.status}).`, response.status);
   return EndSessionResponse.parse(await response.json());
 }
 

@@ -2,6 +2,7 @@ import { DeleteCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { EndSessionResponse } from "@immersr/shared";
 import { endSession } from "../src/routes/end-session.ts";
+import { getSession, settle } from "../src/lib/metering.ts";
 import { me } from "../src/routes/me.ts";
 import { createSession } from "../src/routes/sessions.ts";
 import { createTestTable, fakeOutsideWorld, httpEvent, parseBody, testDb, testDeps } from "./harness.ts";
@@ -109,6 +110,21 @@ describe("POST /api/sessions/{id}/end", () => {
     expect(parseBody(second)).toEqual(parseBody(first));
     expect((await item("LEARNER#repeater", "USAGE#2026-10-19"))?.reservedSeconds).toBe(120);
     expect((await item("LEARNER#repeater", "IMMERSION#pt-PT"))?.partnerSeconds).toBe(100);
+  });
+
+  it("accepts a late End after the scheduled hang-up timed the Session out, without error or a second settlement", async () => {
+    const { fake, deps, sessionId, end } = await start("latecomer");
+    fake.clock.advance(15 * 60 * 1000);
+    const session = (await getSession(deps, "latecomer", sessionId))!;
+    await settle(deps, "latecomer", session, "timed-out", 0);
+    fake.clock.advance(60 * 60 * 1000);
+
+    const response = await end(600);
+
+    expect(response.statusCode).toBe(200);
+    expect(EndSessionResponse.parse(parseBody(response))).toEqual({ chargedSeconds: 900, immersionSeconds: 0 });
+    expect((await item("LEARNER#latecomer", "USAGE#2026-10-19"))?.reservedSeconds).toBe(900);
+    expect(await item("LEARNER#latecomer", "IMMERSION#pt-PT")).toBeUndefined();
   });
 
   it("settles once when two End calls race", async () => {
