@@ -1,0 +1,20 @@
+name: Claude debug (temporary)
+
+# Manual-only smoke test for the Claude action's authentication. Delete once @claude works.
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          show_full_output: true
+          prompt: "Reply with exactly the word OK and nothing else. Do not use any tools."
