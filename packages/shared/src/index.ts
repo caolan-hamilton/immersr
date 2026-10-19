@@ -53,3 +53,19 @@ export const WebConfig = z.object({
   clientId: z.string(),
 });
 export type WebConfig = z.infer<typeof WebConfig>;
+
+/** Why a Session was refused with 429: the Learner's own Daily allowance, or the app-wide cap. */
+export const SessionRefusal = z.object({ reason: z.enum(["daily-allowance", "global-cap"]) });
+export type SessionRefusal = z.infer<typeof SessionRefusal>;
+
+export const EndSessionRequest = z.object({
+  /** Seconds the Partner spoke, as the browser counted them. Untrusted: the server caps it. */
+  partnerSeconds: z.number().int().nonnegative(),
+});
+export type EndSessionRequest = z.infer<typeof EndSessionRequest>;
+
+export const EndSessionResponse = z.object({
+  chargedSeconds: z.number().int().nonnegative(),
+  immersionSeconds: z.number().int().nonnegative(),
+});
+export type EndSessionResponse = z.infer<typeof EndSessionResponse>;

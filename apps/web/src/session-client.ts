@@ -1,6 +1,12 @@
 // Connects a Session over WebRTC (ADR 0001, ADR 0004): the browser posts its SDP offer to our API and
 // never holds an OpenAI credential. Events arrive on the "oai-events" data channel.
-import { CreateSessionResponse, type CreateSessionRequest } from "@immersr/shared";
+import {
+  CreateSessionResponse,
+  EndSessionResponse,
+  SessionRefusal,
+  type CreateSessionRequest,
+  type EndSessionRequest,
+} from "@immersr/shared";
 import { getIdToken } from "./auth.ts";
 
 export type TurnSpeaker = "Partner" | "Learner";
@@ -16,11 +22,33 @@ export interface SessionEvents {
 
 export class MicrophoneBlockedError extends Error {}
 export class SessionStartError extends Error {}
+/** The start was refused with 429 before any call was made. */
+export class SessionRefusedError extends Error {
+  constructor(readonly reason: SessionRefusal["reason"]) {
+    super(reason);
+  }
+}
 
 export interface LiveSession {
   sessionId: string;
   endsAt: string;
+  /** Closes the connection locally. The server settles separately, via `reportEnd`. */
   end(): void;
+  /** Seconds the Partner has spoken so far: output audio tokens ÷ 20 from each `response.done`. */
+  partnerSeconds(): number;
+}
+
+/** Tells the server the Session is over; it hangs up, settles on its own clock and returns the result. */
+export async function reportEnd(sessionId: string, partnerSeconds: number): Promise<EndSessionResponse> {
+  const token = await getIdToken();
+  if (!token) throw new Error("You've been signed out. Please sign in again.");
+  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/end`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ partnerSeconds: Math.floor(partnerSeconds) } satisfies EndSessionRequest),
+  });
+  if (!response.ok) throw new Error(`Couldn't end the Session cleanly (${response.status}).`);
+  return EndSessionResponse.parse(await response.json());
 }
 
 export async function startSession(
@@ -55,12 +83,22 @@ export async function startSession(
     for (const track of mic.getTracks()) pc.addTrack(track, mic);
 
     let draft = "";
+    let outputAudioTokens = 0;
     const channel = pc.createDataChannel("oai-events");
     // Opening the channel is the cue for the Partner to speak first.
     channel.onopen = () => channel.send(JSON.stringify({ type: "response.create" }));
     channel.onmessage = (message) => {
-      const event = JSON.parse(String(message.data)) as { type: string; delta?: string; transcript?: string; error?: { message?: string } };
+      const event = JSON.parse(String(message.data)) as {
+        type: string;
+        delta?: string;
+        transcript?: string;
+        error?: { message?: string };
+        response?: { usage?: { output_token_details?: { audio_tokens?: number } } };
+      };
       switch (event.type) {
+        case "response.done":
+          outputAudioTokens += event.response?.usage?.output_token_details?.audio_tokens ?? 0;
+          break;
         case "response.output_audio_transcript.delta":
           draft += event.delta ?? "";
           events.onPartnerDraft(draft);
@@ -90,7 +128,10 @@ export async function startSession(
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(request),
     });
-    if (response.status === 403) throw new SessionStartError("Sessions aren't open to your account yet.");
+    if (response.status === 429) {
+      const refusal = SessionRefusal.safeParse(await response.json().catch(() => undefined));
+      throw new SessionRefusedError(refusal.success ? refusal.data.reason : "global-cap");
+    }
     if (response.status === 422) {
       throw new SessionStartError("That Topic can't be used. Please choose another Topic. Your other choices are kept.");
     }
@@ -98,7 +139,12 @@ export async function startSession(
     const created = CreateSessionResponse.parse(await response.json());
     await pc.setRemoteDescription({ type: "answer", sdp: created.sdpAnswer });
 
-    return { sessionId: created.sessionId, endsAt: created.endsAt, end: close };
+    return {
+      sessionId: created.sessionId,
+      endsAt: created.endsAt,
+      end: close,
+      partnerSeconds: () => outputAudioTokens / 20,
+    };
   } catch (err) {
     close();
     throw err;
