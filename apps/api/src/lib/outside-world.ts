@@ -32,7 +32,7 @@ const notYetBuilt = (name: string, issue: string) => async (): Promise<never> =>
 
 // Read at runtime (never at deploy time) and kept for the life of the Lambda container.
 let apiKey: Promise<string> | undefined;
-const openaiApiKey = () =>
+export const openaiApiKey = () =>
   (apiKey ??= new SSMClient({})
     .send(new GetParameterCommand({ Name: OPENAI_API_KEY_PARAMETER, WithDecryption: true }))
     .then((out) => {

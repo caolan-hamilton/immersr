@@ -12,6 +12,7 @@
     "db:local:stop": "docker stop immersr-dynamodb",
     "synth": "pnpm build:web && pnpm --filter @immersr/infra cdk synth",
     "deploy:dev": "pnpm build:web && pnpm --filter @immersr/infra cdk deploy \"Immersr-dev-*\"",
+    "drift-check": "pnpm --filter @immersr/api drift-check",
     "dev:web": "pnpm --filter @immersr/web dev"
   }
 }
