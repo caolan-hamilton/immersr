@@ -9,9 +9,9 @@ import {
   type MeResponse,
 } from "@immersr/shared";
 import { formatCountdown, formatDuration, formatTimeOfDay, languageName } from "./format.ts";
+import { clearPendingEnd, deliverPendingEnd, loadPendingEnd, savePendingEnd, type PendingEnd } from "./pending-end.ts";
 import {
   MicrophoneBlockedError,
-  reportEnd,
   SessionRefusedError,
   startSession,
   type LiveSession,
@@ -36,7 +36,9 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
   const [summary, setSummary] = useState<EndSessionResponse>();
   const finishing = useRef(false);
   // The Session the server hasn't settled yet, kept so a failed End can be retried.
-  const unsettled = useRef<{ sessionId: string; partnerSeconds: number } | undefined>(undefined);
+  // Also saved on the device, so it survives a closed tab or a reload.
+  const unsettled = useRef<PendingEnd | undefined>(loadPendingEnd());
+  const retrying = useRef(false);
   const [language, setLanguage] = useState<Language>("pt-PT");
   const [level, setLevel] = useState<Level>("A1");
   const [topic, setTopic] = useState("");
@@ -50,6 +52,25 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
   // Hang up if the Learner navigates away mid-Session.
   useEffect(() => () => live.current?.end(), []);
 
+  // If the tab closes or reloads mid-Session, keep the Session on the device so the next load can End it.
+  // Nothing is saved while the Session is simply live, so a second tab never Ends a Session another tab is running.
+  useEffect(() => {
+    const keepForRetry = () => {
+      const session = live.current;
+      if (session) savePendingEnd({ sessionId: session.sessionId, partnerSeconds: session.partnerSeconds() });
+    };
+    // A tab restored from the back/forward cache is still live, so its saved entry must not be retried elsewhere.
+    const dropIfStillLive = (event: PageTransitionEvent) => {
+      if (event.persisted && live.current) clearPendingEnd();
+    };
+    window.addEventListener("pagehide", keepForRetry);
+    window.addEventListener("pageshow", dropIfStillLive);
+    return () => {
+      window.removeEventListener("pagehide", keepForRetry);
+      window.removeEventListener("pageshow", dropIfStillLive);
+    };
+  }, []);
+
   // Closes the connection, then has the server hang up and settle. Safe to call twice (End, countdown, drop).
   const finish = async () => {
     const session = live.current;
@@ -58,6 +79,7 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
     setPhase("ending");
     setDraft("");
     unsettled.current = { sessionId: session.sessionId, partnerSeconds: session.partnerSeconds() };
+    savePendingEnd(unsettled.current);
     session.end();
     live.current = undefined;
     await settleUnsettled();
@@ -70,7 +92,7 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
     setPhase("ending");
     setError(undefined);
     try {
-      setSummary(await reportEnd(pending.sessionId, pending.partnerSeconds));
+      setSummary(await deliverPendingEnd(pending));
       unsettled.current = undefined;
       finishing.current = false;
       setPhase("setup");
@@ -84,6 +106,32 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
   };
   const finishRef = useRef(finish);
   finishRef.current = finish;
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
+
+  // A Session left unsettled by a drop or a closed tab is settled quietly when the app loads or comes back online.
+  useEffect(() => {
+    const retryInBackground = async () => {
+      const pending = unsettled.current;
+      if (!pending || live.current || finishing.current || retrying.current) return;
+      retrying.current = true;
+      try {
+        const result = await deliverPendingEnd(pending);
+        unsettled.current = undefined;
+        if (result) setSummary(result);
+        setError(undefined);
+        setPhase("setup");
+        onSettledRef.current();
+      } catch {
+        // Still unreachable: the entry stays saved and the next load or online event tries again.
+      } finally {
+        retrying.current = false;
+      }
+    };
+    void retryInBackground();
+    window.addEventListener("online", retryInBackground);
+    return () => window.removeEventListener("online", retryInBackground);
+  }, []);
 
   // Count down to the end time; at zero the Session is over whether or not the server hang-up has fired.
   useEffect(() => {
@@ -100,6 +148,11 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
   }, [phase]);
 
   const start = async () => {
+    // A previous Session still waiting to be settled is dealt with first, so its saved End isn't overwritten.
+    if (unsettled.current) {
+      await settleUnsettled();
+      if (unsettled.current) return;
+    }
     setPhase("connecting");
     setSummary(undefined);
     setError(undefined);
