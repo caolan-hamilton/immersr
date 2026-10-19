@@ -1,4 +1,5 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
+import { DAILY_ALLOWANCE_SECONDS } from "./limits.ts";
 
 export interface Caller {
   /** The Learner's identity: always the JWT `sub`, never anything from the request body. */
@@ -6,7 +7,8 @@ export interface Caller {
   isAdmin: boolean;
 }
 
-export const DAILY_ALLOWANCE_SECONDS = { learner: 15 * 60, admin: 90 * 60 } as const;
+export const allowanceSeconds = (caller: Caller) =>
+  caller.isAdmin ? DAILY_ALLOWANCE_SECONDS.admin : DAILY_ALLOWANCE_SECONDS.learner;
 
 /** API Gateway renders the `cognito:groups` array claim as "[a b]" (or a bare string for one group). */
 export function parseGroups(claim: unknown): string[] {

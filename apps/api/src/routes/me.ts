@@ -3,7 +3,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructured
 import type { MeResponse } from "@immersr/shared";
 import type { Deps } from "../lib/deps.ts";
 import { json } from "../lib/http.ts";
-import { callerOf, DAILY_ALLOWANCE_SECONDS, nextUtcMidnight, usageDay } from "../lib/learner.ts";
+import { allowanceSeconds, callerOf, nextUtcMidnight, usageDay } from "../lib/learner.ts";
 import { TABLE } from "../lib/table.ts";
 
 const IMMERSION_PREFIX = "IMMERSION#";
@@ -12,7 +12,8 @@ const IMMERSION_PREFIX = "IMMERSION#";
 export const me =
   (deps: Deps) =>
   async (event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyStructuredResultV2> => {
-    const { sub, isAdmin } = callerOf(event);
+    const caller = callerOf(event);
+    const { sub } = caller;
     const now = deps.world.clock.now();
     const pk = `LEARNER#${sub}`;
 
@@ -36,7 +37,7 @@ export const me =
     const body: MeResponse = {
       allowance: {
         usedSeconds: usage.Item?.reservedSeconds ?? 0,
-        limitSeconds: isAdmin ? DAILY_ALLOWANCE_SECONDS.admin : DAILY_ALLOWANCE_SECONDS.learner,
+        limitSeconds: allowanceSeconds(caller),
         resetsAt: nextUtcMidnight(now).toISOString(),
       },
       immersion: Object.fromEntries(
