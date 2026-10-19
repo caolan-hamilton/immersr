@@ -1,4 +1,4 @@
-# Crosstalk
+# Crosstalki
 
 A language-immersion web app: a live AI voice Partner speaks only the Target language and the Learner replies in English. See `GLOSSARY.md` for vocabulary and `docs/adr/` for decisions.
 
