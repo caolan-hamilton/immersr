@@ -18,7 +18,7 @@ export class CiStack extends Stack {
     });
 
     const role = new iam.Role(this, "DeployRole", {
-      roleName: "crosstalki-github-deploy",
+      roleName: "immersr-github-deploy",
       assumedBy: new iam.WebIdentityPrincipal(provider.oidcProviderArn, {
         StringEquals: {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",

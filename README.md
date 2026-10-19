@@ -1,4 +1,4 @@
-# Crosstalki
+# Immersr
 
 A language-immersion web app. A live AI voice Partner speaks only the Target language, and the Learner replies in English. Read [GLOSSARY.md](GLOSSARY.md) for the vocabulary and [docs/adr/](docs/adr/) for the decisions behind the design. The MVP spec is issue #1.
 
@@ -9,7 +9,7 @@ A language-immersion web app. A live AI voice Partner speaks only the Target lan
 | `apps/web` | React + Vite single-page app |
 | `apps/api` | Lambda handlers (Node/TypeScript), test harness |
 | `packages/shared` | zod request/response schemas used by web and api |
-| `infra` | AWS CDK app: `Crosstalki-prod`, `Crosstalki-dev-<you>`, `Crosstalki-ci` |
+| `infra` | AWS CDK app: `Immersr-prod`, `Immersr-dev-<you>`, `Immersr-ci` |
 | `spikes/` | throwaway experiments (voice accent/drift test) |
 
 ## Develop
@@ -28,7 +28,7 @@ pnpm typecheck
 Your own stage, deployed from your laptop (needs AWS credentials and the one-off bootstrap in [docs/setup/bootstrap.md](docs/setup/bootstrap.md)):
 
 ```sh
-pnpm deploy:dev      # deploys Crosstalki-dev-$USER and prints its Url
+pnpm deploy:dev      # deploys Immersr-dev-$USER and prints its Url
 API_PROXY=<that Url> pnpm dev:web   # local Vite app talking to your dev API
 ```
 

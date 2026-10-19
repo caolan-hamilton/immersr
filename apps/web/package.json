@@ -1,5 +1,5 @@
 {
-  "name": "@crosstalki/web",
+  "name": "@immersr/web",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "@crosstalki/shared": "workspace:*",
+    "@immersr/shared": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

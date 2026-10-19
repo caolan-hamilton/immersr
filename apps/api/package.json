@@ -1,5 +1,5 @@
 {
-  "name": "@crosstalki/api",
+  "name": "@immersr/api",
   "private": true,
   "type": "module",
   "exports": { "./table": "./src/lib/table.ts" },
@@ -10,7 +10,7 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1152.0",
     "@aws-sdk/lib-dynamodb": "^3.1152.0",
-    "@crosstalki/shared": "workspace:*"
+    "@immersr/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.164",

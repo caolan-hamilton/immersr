@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HealthResponse } from "@crosstalki/shared";
+import { HealthResponse } from "@immersr/shared";
 
 type State = { kind: "loading" } | { kind: "ok"; health: HealthResponse } | { kind: "error"; message: string };
 
@@ -17,7 +17,7 @@ export function App() {
 
   return (
     <main>
-      <h1>Crosstalki</h1>
+      <h1>Immersr</h1>
       <p className="muted">Live conversation in the language you're acquiring.</p>
       <section aria-live="polite">
         {state.kind === "loading" && <p>Checking the API…</p>}

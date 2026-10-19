@@ -11,7 +11,7 @@ import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import type { Construct } from "constructs";
-import { TABLE } from "@crosstalki/api/table";
+import { TABLE } from "@immersr/api/table";
 
 const path = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 

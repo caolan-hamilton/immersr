@@ -174,7 +174,7 @@ importers:
       '@aws-sdk/lib-dynamodb':
         specifier: ^3.1152.0
         version: 3.1152.0(@aws-sdk/client-dynamodb@3.1152.0)
-      '@crosstalki/shared':
+      '@immersr/shared':
         specifier: workspace:*
         version: link:../../packages/shared
     devDependencies:
@@ -193,7 +193,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@crosstalki/shared':
+      '@immersr/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       react:
@@ -221,7 +221,7 @@ importers:
 
   infra:
     dependencies:
-      '@crosstalki/api':
+      '@immersr/api':
         specifier: workspace:*
         version: link:../apps/api
       aws-cdk-lib:

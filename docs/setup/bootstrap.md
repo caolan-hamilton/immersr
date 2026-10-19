@@ -21,10 +21,10 @@ This creates the `cdk-*` roles and asset bucket that every deploy uses.
 ## 3. Deploy the GitHub OIDC deploy role
 
 ```sh
-npx cdk deploy Crosstalki-ci
+npx cdk deploy Immersr-ci
 ```
 
-Note the `DeployRoleArn` output. The role trusts only pushes to `main` on `caolan-hamilton/crosstalki`, and it can only assume the CDK bootstrap roles.
+Note the `DeployRoleArn` output. The role trusts only pushes to `main` on `caolan-hamilton/immersr`, and it can only assume the CDK bootstrap roles.
 
 > If your account already has a GitHub OIDC provider (`token.actions.githubusercontent.com`), this deploy fails with "already exists". In that case, delete the old provider, or ask for `CiStack` to import the existing one.
 
@@ -38,4 +38,4 @@ The workflow's deploy job is skipped until this variable exists. The workflow al
 
 ## 5. Check it
 
-Push to `main`. Then open the `Url` output of `Crosstalki-prod` (shown in the workflow log, or by running `aws cloudformation describe-stacks --stack-name Crosstalki-prod --region eu-west-1`). The page should show "API healthy on **prod**".
+Push to `main`. Then open the `Url` output of `Immersr-prod` (shown in the workflow log, or by running `aws cloudformation describe-stacks --stack-name Immersr-prod --region eu-west-1`). The page should show "API healthy on **prod**".

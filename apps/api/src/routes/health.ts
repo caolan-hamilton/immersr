@@ -1,6 +1,6 @@
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
-import type { HealthResponse } from "@crosstalki/shared";
+import type { HealthResponse } from "@immersr/shared";
 import type { Deps } from "../lib/deps.ts";
 import { json } from "../lib/http.ts";
 

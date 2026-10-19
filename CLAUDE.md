@@ -1,4 +1,4 @@
-# Crosstalki
+# Immersr
 
 A language-immersion web app: a live AI voice Partner speaks only the Target language and the Learner replies in English. See `GLOSSARY.md` for vocabulary and `docs/adr/` for decisions.
 
@@ -6,7 +6,7 @@ A language-immersion web app: a live AI voice Partner speaks only the Target lan
 
 ### Issue tracker
 
-Issues and specs live in GitHub Issues on `caolan-hamilton/crosstalki` (private), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues and specs live in GitHub Issues on `caolan-hamilton/immersr` (private), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

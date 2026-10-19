@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { HealthResponse } from "@crosstalki/shared";
+import { HealthResponse } from "@immersr/shared";
 import { health } from "../src/routes/health.ts";
 import { createTestTable, fakeOutsideWorld, httpEvent, parseBody, testDeps } from "./harness.ts";
 

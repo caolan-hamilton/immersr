@@ -1,5 +1,5 @@
 {
-  "name": "@crosstalki/infra",
+  "name": "@immersr/infra",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,7 +7,7 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "@crosstalki/api": "workspace:*",
+    "@immersr/api": "workspace:*",
     "aws-cdk-lib": "^2.273.0",
     "constructs": "^10.8.1"
   },

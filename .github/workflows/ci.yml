@@ -52,5 +52,5 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: eu-west-1
       - run: pnpm build:web
-      - run: pnpm --filter @crosstalki/infra cdk diff Crosstalki-prod
-      - run: pnpm --filter @crosstalki/infra cdk deploy Crosstalki-prod --require-approval never
+      - run: pnpm --filter @immersr/infra cdk diff Immersr-prod
+      - run: pnpm --filter @immersr/infra cdk deploy Immersr-prod --require-approval never
