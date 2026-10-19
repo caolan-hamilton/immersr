@@ -13,6 +13,15 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7
+      # Prints only non-secret facts about the token (length, public prefix, stray characters), never the value.
+      - name: Token shape
+        env:
+          T: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          printf 'length=%s\n' "${#T}"
+          printf 'prefix_ok=%s\n' "$([[ "$T" == sk-ant-oat01-* ]] && echo yes || echo no)"
+          printf 'whitespace_chars=%s\n' "$(printf '%s' "$T" | tr -cd '[:space:]' | wc -c)"
+          printf 'other_unexpected_chars=%s\n' "$(printf '%s' "$T" | tr -d 'A-Za-z0-9_-' | tr -d '[:space:]' | wc -c)"
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
