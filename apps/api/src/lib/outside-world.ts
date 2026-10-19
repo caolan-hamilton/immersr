@@ -3,6 +3,12 @@ import {
   CognitoIdentityProviderClient,
   UserNotFoundException,
 } from "@aws-sdk/client-cognito-identity-provider";
+import {
+  ActionAfterCompletion,
+  CreateScheduleCommand,
+  FlexibleTimeWindowMode,
+  SchedulerClient,
+} from "@aws-sdk/client-scheduler";
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { OPENAI_API_KEY_PARAMETER } from "./openai-key.ts";
 
@@ -107,6 +113,31 @@ async function deleteUser(sub: string) {
   }
 }
 
+const requireEnv = (name: string): string => {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing environment variable ${name}`);
+  return value;
+};
+
+// A one-time schedule that deletes itself after it runs (spec #1). Its input is what the hang-up Lambda receives.
+async function scheduleHangup(target: HangupTarget, at: Date) {
+  await new SchedulerClient({}).send(
+    new CreateScheduleCommand({
+      Name: `hangup-${target.sessionId}`,
+      GroupName: requireEnv("SCHEDULE_GROUP_NAME"),
+      ScheduleExpression: `at(${at.toISOString().slice(0, 19)})`,
+      ScheduleExpressionTimezone: "UTC",
+      FlexibleTimeWindow: { Mode: FlexibleTimeWindowMode.OFF },
+      ActionAfterCompletion: ActionAfterCompletion.DELETE,
+      Target: {
+        Arn: requireEnv("HANGUP_FUNCTION_ARN"),
+        RoleArn: requireEnv("SCHEDULER_ROLE_ARN"),
+        Input: JSON.stringify(target),
+      },
+    }),
+  );
+}
+
 // Real clients are added by the tickets that first need them.
 export function productionOutsideWorld(): OutsideWorld {
   return {
@@ -115,7 +146,7 @@ export function productionOutsideWorld(): OutsideWorld {
       hangup,
       moderate,
     },
-    scheduler: { scheduleHangup: notYetBuilt("scheduler.scheduleHangup", "#6") },
+    scheduler: { scheduleHangup },
     translate: { toEnglish: notYetBuilt("translate.toEnglish", "#8") },
     identity: { deleteUser },
     clock: { now: () => new Date() },

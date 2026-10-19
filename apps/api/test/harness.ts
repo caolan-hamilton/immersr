@@ -56,6 +56,7 @@ export function fakeOutsideWorld(start = new Date("2026-10-19T12:00:00Z")) {
     failCreateCall: false,
     failHangup: false,
     failDeleteUser: false,
+    failSchedule: false,
     flagTopics: false,
   };
 
@@ -78,6 +79,7 @@ export function fakeOutsideWorld(start = new Date("2026-10-19T12:00:00Z")) {
     },
     scheduler: {
       async scheduleHangup(target, at) {
+        if (steer.failSchedule) throw new Error("fake scheduler failure");
         recorded.schedules.push({ target, at });
       },
     },

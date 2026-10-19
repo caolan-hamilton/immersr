@@ -7,6 +7,7 @@ import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as scheduler from "aws-cdk-lib/aws-scheduler";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
@@ -64,7 +65,8 @@ export class AppStack extends Stack {
     const sessionsFn = fn("SessionsFn", "sessions.ts");
     const endSessionFn = fn("EndSessionFn", "end-session.ts");
     const deleteMeFn = fn("DeleteMeFn", "delete-me.ts"); // hangs up an active Session, so it needs the key too
-    for (const f of [sessionsFn, endSessionFn, deleteMeFn]) {
+    const hangUpFn = fn("HangUpFn", "hang-up.ts");
+    for (const f of [sessionsFn, endSessionFn, deleteMeFn, hangUpFn]) {
       table.grantReadWriteData(f);
       f.addToRolePolicy(
         new iam.PolicyStatement({
@@ -73,6 +75,24 @@ export class AppStack extends Stack {
         }),
       );
     }
+
+    // Each Session gets a one-time schedule, set to delete itself, that invokes the hang-up Lambda at the
+    // maximum Session length.
+    const scheduleGroup = new scheduler.CfnScheduleGroup(this, "HangUpSchedules");
+    const schedulerRole = new iam.Role(this, "HangUpSchedulerRole", {
+      assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com"),
+    });
+    hangUpFn.grantInvoke(schedulerRole);
+    sessionsFn.addEnvironment("SCHEDULE_GROUP_NAME", scheduleGroup.ref);
+    sessionsFn.addEnvironment("HANGUP_FUNCTION_ARN", hangUpFn.functionArn);
+    sessionsFn.addEnvironment("SCHEDULER_ROLE_ARN", schedulerRole.roleArn);
+    sessionsFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["scheduler:CreateSchedule"],
+        resources: [`arn:${this.partition}:scheduler:${this.region}:${this.account}:schedule/${scheduleGroup.ref}/*`],
+      }),
+    );
+    sessionsFn.addToRolePolicy(new iam.PolicyStatement({ actions: ["iam:PassRole"], resources: [schedulerRole.roleArn] }));
 
     const api = new apigw.HttpApi(this, "Api", { createDefaultStage: true });
     api.addRoutes({
