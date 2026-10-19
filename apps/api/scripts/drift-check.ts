@@ -30,7 +30,7 @@ const onlyLanguage = choose("language", LANGUAGES, values.language);
 const languages: readonly Language[] = onlyLanguage ? [onlyLanguage] : LANGUAGES;
 const level: Level = choose("level", LEVELS, values.level) ?? "A1";
 
-type RealtimeEvent = { type: string; text?: string; error?: unknown };
+type RealtimeEvent = { type: string; text?: string; error?: unknown; response?: { status?: string } };
 
 /** Plays all scripted Turns over one realtime connection (so context builds up as in a Session) and returns the Partner replies. */
 async function converse(apiKey: string, language: Language): Promise<string[]> {
@@ -84,9 +84,17 @@ async function converse(apiKey: string, language: Language): Promise<string[]> {
       });
       send({ type: "response.create" });
       let reply = "";
-      for (let event = await next(); event.type !== "response.done"; event = await next()) {
+      let event = await next();
+      for (; event.type !== "response.done"; event = await next()) {
         if (event.type === "error") throw new Error(`OpenAI error: ${JSON.stringify(event.error)}`);
-        if (event.type === "response.output_text.done") reply = event.text ?? "";
+        if (event.type === "response.output_text.done") reply += event.text ?? "";
+      }
+      // An empty or failed reply must never look like a pass: the event flow is easy to get subtly wrong.
+      if (event.response?.status !== "completed") {
+        throw new Error(`Response ended as "${event.response?.status}" for Learner Turn: ${text}`);
+      }
+      if (!reply.trim()) {
+        throw new Error(`Empty Partner reply for Learner Turn: ${text} (did the realtime event names change?)`);
       }
       replies.push(reply);
     }
@@ -103,16 +111,20 @@ let drifted = false;
 for (const language of languages) {
   const replies = await converse(apiKey, language);
   let failures = 0;
+  let conclusive = 0;
   console.log(`== ${language}`);
   replies.forEach((reply, i) => {
     const result = checkLanguage(reply, language);
     if (result.verdict === "drift") failures++;
+    if (result.verdict !== "inconclusive") conclusive++;
     const mark = { pass: "ok   ", inconclusive: "?    ", drift: "DRIFT" }[result.verdict];
     const detected = result.verdict === "inconclusive" ? "too short to tell" : `detected ${result.detected}`;
     console.log(`  ${mark} Learner: ${LEARNER_TURNS[i]}\n        Partner: ${reply} (${detected})`);
   });
-  console.log(`  ${failures ? "FAIL" : "PASS"} ${language}: ${failures} of ${replies.length} replies drifted\n`);
-  drifted ||= failures > 0;
+  const failed = failures > 0 || conclusive === 0;
+  const note = conclusive === 0 ? " (nothing could be checked)" : "";
+  console.log(`  ${failed ? "FAIL" : "PASS"} ${language}: ${failures} of ${replies.length} replies drifted, ${conclusive} checked${note}\n`);
+  drifted ||= failed;
 }
 console.log(drifted ? "FAIL: the Partner drifted out of the Target language" : "PASS: every reply was in the Target language");
 process.exit(drifted ? 1 : 0);
