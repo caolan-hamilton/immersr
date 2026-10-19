@@ -14,6 +14,8 @@ import {
   reportEnd,
   SessionRefusedError,
   startSession,
+  TranslationLimitError,
+  translateTurn,
   type LiveSession,
   type TurnSpeaker,
 } from "./session-client.ts";
@@ -22,6 +24,11 @@ interface Turn {
   speaker: TurnSpeaker;
   text: string;
 }
+
+/** A Partner Turn's Turn translation, kept per Turn so tapping again never asks (or counts) twice. */
+type TurnTranslation = { state: "loading" } | { state: "done"; text: string } | { state: "failed"; message: string };
+
+const TRANSLATION_LIMIT_MESSAGE = "You've reached today's translation limit. It resets at midnight UTC.";
 
 type Phase = "setup" | "connecting" | "live" | "ending" | "end-failed";
 
@@ -46,6 +53,22 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
   const [error, setError] = useState<string>();
   const [micBlocked, setMicBlocked] = useState(false);
   const live = useRef<LiveSession | undefined>(undefined);
+  const [translations, setTranslations] = useState<Record<number, TurnTranslation>>({});
+  // The live Session that Turn translations are asked for.
+  const transcriptSession = useRef<string | undefined>(undefined);
+
+  const showTranslation = async (index: number, text: string) => {
+    const sessionId = transcriptSession.current;
+    if (!sessionId || translations[index]?.state === "loading" || translations[index]?.state === "done") return;
+    setTranslations((previous) => ({ ...previous, [index]: { state: "loading" } }));
+    try {
+      const translation = await translateTurn(sessionId, text);
+      setTranslations((previous) => ({ ...previous, [index]: { state: "done", text: translation } }));
+    } catch (err) {
+      const message = err instanceof TranslationLimitError ? TRANSLATION_LIMIT_MESSAGE : err instanceof Error ? err.message : String(err);
+      setTranslations((previous) => ({ ...previous, [index]: { state: "failed", message } }));
+    }
+  };
 
   // Hang up if the Learner navigates away mid-Session.
   useEffect(() => () => live.current?.end(), []);
@@ -105,6 +128,8 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
     setError(undefined);
     setMicBlocked(false);
     setTurns([]);
+    setTranslations({});
+    transcriptSession.current = undefined;
     setDraft("");
     try {
       live.current = await startSession(
@@ -119,6 +144,7 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
           },
         },
       );
+      transcriptSession.current = live.current.sessionId;
       setPhase("live");
     } catch (err) {
       if (err instanceof MicrophoneBlockedError) setMicBlocked(true);
@@ -212,11 +238,30 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
       )}
       {(turns.length > 0 || draft) && (
         <ul className="transcript" aria-live="polite">
-          {turns.map((turn, i) => (
-            <li key={i}>
-              <b>{turn.speaker === "Partner" ? "Partner" : "You"}:</b> {turn.text}
-            </li>
-          ))}
+          {turns.map((turn, i) => {
+            const translation = translations[i];
+            // Translations only work while the Session is live; after it ends the Transcript is plain text.
+            const tappable = turn.speaker === "Partner" && phase === "live";
+            return (
+              <li key={i}>
+                <b>{turn.speaker === "Partner" ? "Partner" : "You"}:</b>{" "}
+                {tappable ? (
+                  <button type="button" className="turn" onClick={() => void showTranslation(i, turn.text)}>
+                    {turn.text}
+                  </button>
+                ) : (
+                  turn.text
+                )}
+                {translation?.state === "loading" && <div className="muted">Translating…</div>}
+                {translation?.state === "done" && <div className="translation">{translation.text}</div>}
+                {translation?.state === "failed" && (
+                  <div role="alert">
+                    <span className="dot bad" /> {translation.message}
+                  </div>
+                )}
+              </li>
+            );
+          })}
           {draft && (
             <li className="muted">
               <b>Partner:</b> {draft}

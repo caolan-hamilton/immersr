@@ -73,6 +73,11 @@ export class AppStack extends Stack {
       );
     }
 
+    // Amazon Translate is called with the Lambda's own IAM role: there is no key to store.
+    const translationsFn = fn("TranslationsFn", "translations.ts");
+    table.grantReadWriteData(translationsFn);
+    translationsFn.addToRolePolicy(new iam.PolicyStatement({ actions: ["translate:TranslateText"], resources: ["*"] }));
+
     const api = new apigw.HttpApi(this, "Api", { createDefaultStage: true });
     api.addRoutes({
       path: "/api/health",
@@ -148,6 +153,13 @@ export class AppStack extends Stack {
       path: "/api/sessions/{id}/end",
       methods: [apigw.HttpMethod.POST],
       integration: new HttpLambdaIntegration("EndSessionIntegration", endSessionFn),
+      authorizer,
+    });
+
+    api.addRoutes({
+      path: "/api/translations",
+      methods: [apigw.HttpMethod.POST],
+      integration: new HttpLambdaIntegration("TranslationsIntegration", translationsFn),
       authorizer,
     });
 

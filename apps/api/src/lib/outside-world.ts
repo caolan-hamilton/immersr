@@ -1,3 +1,4 @@
+import { TranslateClient, TranslateTextCommand } from "@aws-sdk/client-translate";
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { OPENAI_API_KEY_PARAMETER } from "./openai-key.ts";
 
@@ -85,6 +86,20 @@ async function moderate(text: string) {
   return { flagged };
 }
 
+let translateClient: TranslateClient | undefined;
+
+// Amazon Translate takes "pt-PT" as is, but only a bare language code for Spanish and French.
+const translateCode = (language: string) => (language === "pt-PT" ? language : language.split("-")[0]!);
+
+async function toEnglish(text: string, language: string) {
+  translateClient ??= new TranslateClient({});
+  const out = await translateClient.send(
+    new TranslateTextCommand({ Text: text, SourceLanguageCode: translateCode(language), TargetLanguageCode: "en" }),
+  );
+  if (!out.TranslatedText) throw new Error("Amazon Translate returned no translation");
+  return out.TranslatedText;
+}
+
 // Real clients are added by the tickets that first need them.
 export function productionOutsideWorld(): OutsideWorld {
   return {
@@ -94,7 +109,7 @@ export function productionOutsideWorld(): OutsideWorld {
       moderate,
     },
     scheduler: { scheduleHangup: notYetBuilt("scheduler.scheduleHangup", "#6") },
-    translate: { toEnglish: notYetBuilt("translate.toEnglish", "#8") },
+    translate: { toEnglish },
     clock: { now: () => new Date() },
   };
 }

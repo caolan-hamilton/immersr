@@ -4,8 +4,10 @@ import {
   CreateSessionResponse,
   EndSessionResponse,
   SessionRefusal,
+  TranslateResponse,
   type CreateSessionRequest,
   type EndSessionRequest,
+  type TranslateRequest,
 } from "@immersr/shared";
 import { getIdToken } from "./auth.ts";
 
@@ -49,6 +51,23 @@ export async function reportEnd(sessionId: string, partnerSeconds: number): Prom
   });
   if (!response.ok) throw new Error(`Couldn't end the Session cleanly (${response.status}).`);
   return EndSessionResponse.parse(await response.json());
+}
+
+/** The Learner has used all of today's translations. */
+export class TranslationLimitError extends Error {}
+
+/** The English Turn translation of a Partner Turn's text. */
+export async function translateTurn(sessionId: string, text: string): Promise<string> {
+  const token = await getIdToken();
+  if (!token) throw new Error("You've been signed out. Please sign in again.");
+  const response = await fetch("/api/translations", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ sessionId, text } satisfies TranslateRequest),
+  });
+  if (response.status === 429) throw new TranslationLimitError();
+  if (!response.ok) throw new Error(`Couldn't translate that (${response.status}). Please try again.`);
+  return TranslateResponse.parse(await response.json()).translation;
 }
 
 export async function startSession(
