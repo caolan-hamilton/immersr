@@ -23,6 +23,8 @@ pnpm test            # API tests through the API seam
 pnpm typecheck
 ```
 
+After changing the Partner's instructions, run the live drift check and the listening checklist ([docs/drift-check.md](docs/drift-check.md)). The check costs real money and isn't part of CI.
+
 ### Personal dev stack
 
 Your own stage, deployed from your laptop (needs AWS credentials and the one-off bootstrap in [docs/setup/bootstrap.md](docs/setup/bootstrap.md)):
