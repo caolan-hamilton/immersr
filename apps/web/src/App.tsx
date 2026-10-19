@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { MeResponse } from "@immersr/shared";
+import { SessionPanel } from "./SessionPanel.tsx";
 import { completeSignInIfRedirected, getIdToken, isSignedIn, signIn, signOut } from "./auth.ts";
 
 type State =
@@ -78,6 +79,7 @@ function Home({ me }: { me: MeResponse }) {
           ))}
         </ul>
       )}
+      <SessionPanel />
       <p>
         <button onClick={() => void signOut()}>Sign out</button>
       </p>
