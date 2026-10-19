@@ -31,6 +31,9 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # PRs opened by our own @claude implementer must be reviewed too. Name it explicitly:
+          # never '*', which on a public repo would let any GitHub App trigger a review with its own prompt.
+          allowed_bots: claude
           track_progress: true
           prompt: |
             REPO: ${{ github.repository }}
