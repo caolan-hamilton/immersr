@@ -61,6 +61,17 @@ async function createCall(sdpOffer: string, sessionConfig: unknown) {
   return { sdpAnswer: text, callId };
 }
 
+async function hangup(callId: string) {
+  const response = await fetch(`https://api.openai.com/v1/realtime/calls/${encodeURIComponent(callId)}/hangup`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${await openaiApiKey()}` },
+  });
+  // 404 means the call is already gone (the Learner closed the tab, or OpenAI ended it): that is success.
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`OpenAI hangup failed with ${response.status}: ${await response.text()}`);
+  }
+}
+
 async function moderate(text: string) {
   const response = await fetch("https://api.openai.com/v1/moderations", {
     method: "POST",
@@ -79,7 +90,7 @@ export function productionOutsideWorld(): OutsideWorld {
   return {
     openai: {
       createCall,
-      hangup: notYetBuilt("openai.hangup", "#5"),
+      hangup,
       moderate,
     },
     scheduler: { scheduleHangup: notYetBuilt("scheduler.scheduleHangup", "#6") },

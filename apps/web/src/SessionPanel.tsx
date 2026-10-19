@@ -1,17 +1,42 @@
 import { useEffect, useRef, useState } from "react";
-import { LANGUAGES, LEVELS, TOPIC_MAX_LENGTH, type Language, type Level } from "@immersr/shared";
-import { MicrophoneBlockedError, startSession, type LiveSession, type TurnSpeaker } from "./session-client.ts";
+import {
+  LANGUAGES,
+  LEVELS,
+  TOPIC_MAX_LENGTH,
+  type EndSessionResponse,
+  type Language,
+  type Level,
+  type MeResponse,
+} from "@immersr/shared";
+import { formatCountdown, formatDuration, formatTimeOfDay, languageName } from "./format.ts";
+import {
+  MicrophoneBlockedError,
+  reportEnd,
+  SessionRefusedError,
+  startSession,
+  type LiveSession,
+  type TurnSpeaker,
+} from "./session-client.ts";
 
 interface Turn {
   speaker: TurnSpeaker;
   text: string;
 }
 
-type Phase = "setup" | "connecting" | "live";
+type Phase = "setup" | "connecting" | "live" | "ending" | "end-failed";
 
-const languageName = (code: string) => new Intl.DisplayNames(undefined, { type: "language" }).of(code) ?? code;
+const refusalMessage = (reason: SessionRefusedError["reason"], resetsAt: string) =>
+  reason === "daily-allowance"
+    ? `You've used all of today's allowance. It resets at ${formatTimeOfDay(resetsAt)}.`
+    : "Immersr has reached its capacity for today, so no new Sessions can start right now. This isn't your own allowance. Please try again tomorrow.";
 
-export function SessionPanel() {
+export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["allowance"]; onSettled(): void }) {
+  const remaining = Math.max(0, allowance.limitSeconds - allowance.usedSeconds);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [summary, setSummary] = useState<EndSessionResponse>();
+  const finishing = useRef(false);
+  // The Session the server hasn't settled yet, kept so a failed End can be retried.
+  const unsettled = useRef<{ sessionId: string; partnerSeconds: number } | undefined>(undefined);
   const [language, setLanguage] = useState<Language>("pt-PT");
   const [level, setLevel] = useState<Level>("A1");
   const [topic, setTopic] = useState("");
@@ -25,8 +50,58 @@ export function SessionPanel() {
   // Hang up if the Learner navigates away mid-Session.
   useEffect(() => () => live.current?.end(), []);
 
+  // Closes the connection, then has the server hang up and settle. Safe to call twice (End, countdown, drop).
+  const finish = async () => {
+    const session = live.current;
+    if (!session || finishing.current) return;
+    finishing.current = true;
+    setPhase("ending");
+    setDraft("");
+    unsettled.current = { sessionId: session.sessionId, partnerSeconds: session.partnerSeconds() };
+    session.end();
+    live.current = undefined;
+    await settleUnsettled();
+  };
+
+  // Asks the server to hang up and settle. On failure the Session stays active and charged, so offer a retry.
+  const settleUnsettled = async () => {
+    const pending = unsettled.current;
+    if (!pending) return;
+    setPhase("ending");
+    setError(undefined);
+    try {
+      setSummary(await reportEnd(pending.sessionId, pending.partnerSeconds));
+      unsettled.current = undefined;
+      finishing.current = false;
+      setPhase("setup");
+      onSettled();
+    } catch (err) {
+      finishing.current = false;
+      const reason = err instanceof Error ? err.message : String(err);
+      setError(`${reason} The Session isn't settled yet, so your full allowance is still held. Please try again.`);
+      setPhase("end-failed");
+    }
+  };
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+
+  // Count down to the end time; at zero the Session is over whether or not the server hang-up has fired.
+  useEffect(() => {
+    if (phase !== "live" || !live.current) return;
+    const endsAt = Date.parse(live.current.endsAt);
+    const tick = () => {
+      const left = (endsAt - Date.now()) / 1000;
+      setSecondsLeft(left);
+      if (left <= 0) void finishRef.current();
+    };
+    tick();
+    const timer = setInterval(tick, 250);
+    return () => clearInterval(timer);
+  }, [phase]);
+
   const start = async () => {
     setPhase("connecting");
+    setSummary(undefined);
     setError(undefined);
     setMicBlocked(false);
     setTurns([]);
@@ -39,31 +114,35 @@ export function SessionPanel() {
           onTurn: (speaker, text) => setTurns((previous) => [...previous, { speaker, text }]),
           onError: setError,
           onDisconnected: () => {
-            live.current = undefined;
-            setDraft("");
             setError("The connection to the Partner was lost. The Session has ended.");
-            setPhase("setup");
+            void finishRef.current();
           },
         },
       );
       setPhase("live");
     } catch (err) {
       if (err instanceof MicrophoneBlockedError) setMicBlocked(true);
+      else if (err instanceof SessionRefusedError) setError(refusalMessage(err.reason, allowance.resetsAt));
       else setError(err instanceof Error ? err.message : String(err));
       setPhase("setup");
     }
   };
 
-  const end = () => {
-    live.current?.end();
-    live.current = undefined;
-    setDraft("");
-    setPhase("setup");
-  };
-
   return (
     <>
       <h2>Talk to the Partner</h2>
+      {phase === "setup" && summary && (
+        <p role="status">
+          Session over. <b>{formatDuration(summary.immersionSeconds)}</b> added to your Immersion time (
+          {summary.immersionSeconds}s of the Partner speaking, {formatDuration(summary.chargedSeconds)} of your allowance
+          used).
+        </p>
+      )}
+      {phase === "setup" && (
+        <p className="muted">
+          {formatDuration(remaining)} of your daily allowance left. It resets at {formatTimeOfDay(allowance.resetsAt)}.
+        </p>
+      )}
       {phase === "setup" && (
         <form
           onSubmit={(e) => {
@@ -110,7 +189,14 @@ export function SessionPanel() {
       {phase === "connecting" && <p>Connecting…</p>}
       {phase === "live" && (
         <p>
-          <button onClick={end}>End</button>
+          <b aria-label="Time left in this Session">{formatCountdown(secondsLeft)}</b> left{" "}
+          <button onClick={() => void finish()}>End</button>
+        </p>
+      )}
+      {phase === "ending" && <p>Ending the Session…</p>}
+      {phase === "end-failed" && (
+        <p>
+          <button onClick={() => void settleUnsettled()}>Retry ending the Session</button>
         </p>
       )}
       {micBlocked && (

@@ -62,13 +62,16 @@ export class AppStack extends Stack {
 
     // The OpenAI key is a SecureString the owner creates by hand; the Lambda reads it at runtime only.
     const sessionsFn = fn("SessionsFn", "sessions.ts");
-    table.grantWriteData(sessionsFn);
-    sessionsFn.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["ssm:GetParameter"],
-        resources: [`arn:${this.partition}:ssm:${this.region}:${this.account}:parameter${OPENAI_API_KEY_PARAMETER}`],
-      }),
-    );
+    const endSessionFn = fn("EndSessionFn", "end-session.ts");
+    for (const f of [sessionsFn, endSessionFn]) {
+      table.grantReadWriteData(f);
+      f.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ["ssm:GetParameter"],
+          resources: [`arn:${this.partition}:ssm:${this.region}:${this.account}:parameter${OPENAI_API_KEY_PARAMETER}`],
+        }),
+      );
+    }
 
     const api = new apigw.HttpApi(this, "Api", { createDefaultStage: true });
     api.addRoutes({
@@ -138,6 +141,13 @@ export class AppStack extends Stack {
       path: "/api/sessions",
       methods: [apigw.HttpMethod.POST],
       integration: new HttpLambdaIntegration("SessionsIntegration", sessionsFn),
+      authorizer,
+    });
+
+    api.addRoutes({
+      path: "/api/sessions/{id}/end",
+      methods: [apigw.HttpMethod.POST],
+      integration: new HttpLambdaIntegration("EndSessionIntegration", endSessionFn),
       authorizer,
     });
 

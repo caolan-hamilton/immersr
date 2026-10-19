@@ -1,5 +1,5 @@
-import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { DeleteCommand, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { CreateSessionResponse, LANGUAGES, LEVELS } from "@immersr/shared";
 import { buildInstructions, EXAMPLE_TURNS, LANGUAGE_SPECS, LEVEL_SPECS } from "../src/lib/instructions.ts";
 import { createSession } from "../src/routes/sessions.ts";
@@ -9,6 +9,13 @@ describe("POST /api/sessions", () => {
   let table: Awaited<ReturnType<typeof createTestTable>>;
   beforeAll(async () => (table = await createTestTable()));
   afterAll(async () => table.drop());
+  // The global counter is shared by every test, so each starts from an empty day.
+  beforeEach(async () => {
+    await testDb.send(new DeleteCommand({ TableName: table.tableName, Key: { PK: "GLOBAL", SK: "USAGE#2026-10-19" } }));
+  });
+
+  const item = async (PK: string, SK: string) =>
+    (await testDb.send(new GetCommand({ TableName: table.tableName, Key: { PK, SK } }))).Item;
 
   const post = (body: unknown, opts: { sub?: string; groups?: string[] } = { groups: ["admins"] }) => {
     const fake = fakeOutsideWorld();
@@ -23,7 +30,7 @@ describe("POST /api/sessions", () => {
     expect(response.statusCode).toBe(201);
     const body = CreateSessionResponse.parse(parseBody(response));
     expect(body.sdpAnswer).toBe("answer-for:v=0 offer");
-    expect(body.endsAt).toBe("2026-10-19T12:10:00.000Z");
+    expect(body.endsAt).toBe("2026-10-19T12:15:00.000Z");
 
     expect(fake.recorded.createCalls).toHaveLength(1);
     const { sdpOffer, sessionConfig } = fake.recorded.createCalls[0]!;
@@ -53,11 +60,61 @@ describe("POST /api/sessions", () => {
     });
   });
 
-  it("refuses non-admins with 403 and never calls OpenAI", async () => {
-    const { response, fake } = await post(valid, { sub: "learner", groups: [] });
+  it("starts a Session for a Learner who is not an admin", async () => {
+    const { response } = await post(valid, { sub: "plain-learner", groups: [] });
 
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(201);
+  });
+
+  it("reserves the maximum Session length on the Learner's and the global usage, with a 7 day TTL", async () => {
+    const { response } = await post(valid, { sub: "reserver", groups: [] });
+    const { sessionId } = parseBody(response);
+
+    const learnerUsage = await item("LEARNER#reserver", "USAGE#2026-10-19");
+    const globalUsage = await item("GLOBAL", "USAGE#2026-10-19");
+    const ttl = Date.parse("2026-10-26T00:00:00Z") / 1000;
+    expect(learnerUsage).toMatchObject({ reservedSeconds: 900, ttl });
+    expect(globalUsage?.reservedSeconds).toBe(900);
+    expect(globalUsage?.ttl).toBe(ttl);
+    expect(await item("LEARNER#reserver", `SESSION#${sessionId}`)).toMatchObject({
+      status: "active",
+      usageDay: "2026-10-19",
+      reservedSeconds: 900,
+    });
+  });
+
+  it("refuses a second Session over the Daily allowance with 429 daily-allowance and never calls OpenAI", async () => {
+    await post(valid, { sub: "greedy", groups: [] });
+    const { response, fake } = await post(valid, { sub: "greedy", groups: [] });
+
+    expect(response.statusCode).toBe(429);
+    expect(parseBody(response)).toEqual({ reason: "daily-allowance" });
     expect(fake.recorded.createCalls).toHaveLength(0);
+    expect((await item("LEARNER#greedy", "USAGE#2026-10-19"))?.reservedSeconds).toBe(900);
+  });
+
+  it("refuses with 429 global-cap once the app's cap is reached, without charging the Learner", async () => {
+    await testDb.send(
+      new PutCommand({ TableName: table.tableName, Item: { PK: "GLOBAL", SK: "USAGE#2026-10-19", reservedSeconds: 2700 } }),
+    );
+    const { response, fake } = await post(valid, { sub: "capped", groups: [] });
+
+    expect(response.statusCode).toBe(429);
+    expect(parseBody(response)).toEqual({ reason: "global-cap" });
+    expect(fake.recorded.createCalls).toHaveLength(0);
+    expect(await item("LEARNER#capped", "USAGE#2026-10-19")).toBeUndefined();
+    await testDb.send(new DeleteCommand({ TableName: table.tableName, Key: { PK: "GLOBAL", SK: "USAGE#2026-10-19" } }));
+  });
+
+  it("lets an admin past the global cap, and still counts the admin's usage", async () => {
+    await testDb.send(
+      new PutCommand({ TableName: table.tableName, Item: { PK: "GLOBAL", SK: "USAGE#2026-10-19", reservedSeconds: 2700 } }),
+    );
+    const { response } = await post(valid, { sub: "boss", groups: ["admins"] });
+
+    expect(response.statusCode).toBe(201);
+    expect((await item("GLOBAL", "USAGE#2026-10-19"))?.reservedSeconds).toBe(3600);
+    await testDb.send(new DeleteCommand({ TableName: table.tableName, Key: { PK: "GLOBAL", SK: "USAGE#2026-10-19" } }));
   });
 
   it.each([
@@ -108,28 +165,19 @@ describe("POST /api/sessions", () => {
     expect(fake.recorded.createCalls).toHaveLength(0);
   });
 
-  it("returns 502 and stores nothing when OpenAI fails", async () => {
+  it("returns 502 and releases the Reservation when OpenAI fails", async () => {
     const fake = fakeOutsideWorld();
     fake.steer.failCreateCall = true;
     const response = await createSession(testDeps(table.tableName, fake))(
-      httpEvent({ method: "POST", path: "/api/sessions", body: valid, sub: "unlucky", groups: ["admins"] }),
+      httpEvent({ method: "POST", path: "/api/sessions", body: valid, sub: "unlucky" }),
     );
 
     expect(response.statusCode).toBe(502);
-    expect(await storedSessions("unlucky")).toHaveLength(0);
-  });
-
-  it("hangs up the call and returns 502 when storing the Session fails", async () => {
-    const fake = fakeOutsideWorld();
-    // A table that doesn't exist makes the DynamoDB write fail for real.
-    const response = await createSession(testDeps(`missing-${table.tableName}`, fake))(
-      httpEvent({ method: "POST", path: "/api/sessions", body: valid, sub: "unstored", groups: ["admins"] }),
-    );
-
-    expect(response.statusCode).toBe(502);
-    expect(fake.recorded.createCalls).toHaveLength(1);
-    expect(fake.recorded.hangups).toEqual(["rtc_fake_1"]);
-    expect(await storedSessions("unstored")).toHaveLength(0);
+    expect((await item("LEARNER#unlucky", "USAGE#2026-10-19"))?.reservedSeconds).toBe(0);
+    expect((await item("GLOBAL", "USAGE#2026-10-19"))?.reservedSeconds).toBe(0);
+    const [stored] = await storedSessions("unlucky");
+    expect(stored).toMatchObject({ status: "released", chargedSeconds: 0 });
+    expect(await item("LEARNER#unlucky", "IMMERSION#pt-PT")).toBeUndefined();
   });
 
   it("does not hang up when the Session was stored", async () => {

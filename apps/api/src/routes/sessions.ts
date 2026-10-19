@@ -1,23 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { CreateSessionRequest, type CreateSessionResponse } from "@immersr/shared";
 import type { Deps } from "../lib/deps.ts";
 import { json } from "../lib/http.ts";
 import { buildSessionConfig } from "../lib/instructions.ts";
-import { callerOf, usageDay } from "../lib/learner.ts";
-import { TABLE } from "../lib/table.ts";
+import { allowanceSeconds, callerOf } from "../lib/learner.ts";
+import { MAX_SESSION_SECONDS } from "../lib/limits.ts";
+import { reserve, sessionKey, settle } from "../lib/metering.ts";
 
-/** Below Lambda's 15 minute limit, so a sideband monitor stays possible (ADR 0004). */
-export const MAX_SESSION_SECONDS = 10 * 60;
-
-// POST /api/sessions: broker a Session (ADR 0004). The browser sends its SDP offer; we build the Partner's
-// instructions, create the call with OpenAI and return the answer. Admins only until Sessions are metered.
+// POST /api/sessions: broker a Session (ADR 0004). We build the Partner's instructions, reserve the maximum
+// Session length, then forward the browser's SDP offer to OpenAI and return the answer.
 export const createSession =
   (deps: Deps) =>
   async (event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyStructuredResultV2> => {
-    const { sub, isAdmin } = callerOf(event);
-    if (!isAdmin) return json(403, { error: "Sessions are not open to everyone yet." });
+    const caller = callerOf(event);
+    const { sub, isAdmin } = caller;
 
     let raw: unknown;
     try {
@@ -44,44 +42,55 @@ export const createSession =
 
     const now = deps.world.clock.now();
     const endsAt = new Date(now.getTime() + MAX_SESSION_SECONDS * 1000);
+    const sessionId = randomUUID();
+
+    // Reserve before any call is made: a refused start must never cost us an OpenAI call.
+    const reservation = await reserve(deps, {
+      sub,
+      isAdmin,
+      allowanceSeconds: allowanceSeconds(caller),
+      session: { sessionId, language, level, topic, startedAt: now.toISOString(), endsAt: endsAt.toISOString() },
+    });
+    if (!reservation.ok) return json(429, { reason: reservation.reason });
+
+    const failed = async (message: string, hangUp?: string) => {
+      if (hangUp) {
+        try {
+          await deps.world.openai.hangup(hangUp);
+        } catch (hangupErr) {
+          console.error(`Hanging up orphaned call ${hangUp} failed`, hangupErr);
+        }
+      }
+      try {
+        await settle(deps, sub, reservation.session, "released", 0);
+      } catch (releaseErr) {
+        // The Reservation stays charged: the Learner loses time, never gains it.
+        console.error(`Releasing the Reservation for Session ${sessionId} failed`, releaseErr);
+      }
+      return json(502, { error: message });
+    };
 
     let call: { sdpAnswer: string; callId: string };
     try {
       call = await deps.world.openai.createCall(sdpOffer, buildSessionConfig({ language, level, topic }));
     } catch (err) {
       console.error("Creating the OpenAI call failed", err);
-      return json(502, { error: "Couldn't start the Session. Please try again." });
+      return failed("Couldn't start the Session. Please try again.");
     }
 
-    const sessionId = randomUUID();
     try {
       await deps.db.send(
-        new PutCommand({
+        new UpdateCommand({
           TableName: deps.tableName,
-          Item: {
-            [TABLE.partitionKey]: `LEARNER#${sub}`,
-            [TABLE.sortKey]: `SESSION#${sessionId}`,
-            sessionId,
-            callId: call.callId,
-            status: "active",
-            language,
-            level,
-            topic,
-            usageDay: usageDay(now),
-            startedAt: now.toISOString(),
-            endsAt: endsAt.toISOString(),
-          },
+          Key: sessionKey(sub, sessionId),
+          UpdateExpression: "SET callId = :callId",
+          ExpressionAttributeValues: { ":callId": call.callId },
         }),
       );
     } catch (err) {
-      console.error("Storing the Session failed; hanging up the call", err);
-      // Nothing records this call, so nothing else could end it. Best effort: the 502 matters more.
-      try {
-        await deps.world.openai.hangup(call.callId);
-      } catch (hangupErr) {
-        console.error(`Hanging up orphaned call ${call.callId} failed`, hangupErr);
-      }
-      return json(502, { error: "Couldn't start the Session. Please try again." });
+      console.error("Storing the call ID failed; hanging up the call", err);
+      // Nothing records this call, so nothing else could end it.
+      return failed("Couldn't start the Session. Please try again.", call.callId);
     }
 
     const body: CreateSessionResponse = { sessionId, sdpAnswer: call.sdpAnswer, endsAt: endsAt.toISOString() };

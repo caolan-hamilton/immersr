@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { MeResponse } from "@immersr/shared";
+import { formatDuration, formatTimeOfDay, languageName } from "./format.ts";
 import { SessionPanel } from "./SessionPanel.tsx";
 import { completeSignInIfRedirected, getIdToken, isSignedIn, signIn, signOut } from "./auth.ts";
 
@@ -18,16 +19,10 @@ async function loadMe(): Promise<State> {
   return { kind: "home", me: MeResponse.parse(await response.json()) };
 }
 
-const formatDuration = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
-};
-
-const languageName = (code: string) => new Intl.DisplayNames(undefined, { type: "language" }).of(code) ?? code;
-
 export function App() {
   const [state, setState] = useState<State>({ kind: "loading" });
+  // Refresh the totals after a Session settles, without flashing the loading state.
+  const refreshMe = () => void loadMe().then(setState, () => undefined);
 
   useEffect(() => {
     completeSignInIfRedirected()
@@ -50,13 +45,13 @@ export function App() {
             <span className="dot bad" /> Something went wrong: {state.message}
           </p>
         )}
-        {state.kind === "home" && <Home me={state.me} />}
+        {state.kind === "home" && <Home me={state.me} onSessionSettled={refreshMe} />}
       </section>
     </main>
   );
 }
 
-function Home({ me }: { me: MeResponse }) {
+function Home({ me, onSessionSettled }: { me: MeResponse; onSessionSettled(): void }) {
   const { allowance, immersion } = me;
   const remaining = Math.max(0, allowance.limitSeconds - allowance.usedSeconds);
   const languages = Object.entries(immersion);
@@ -65,7 +60,7 @@ function Home({ me }: { me: MeResponse }) {
       <h2>Today</h2>
       <p>
         <b>{formatDuration(remaining)}</b> of your daily allowance left. It resets at{" "}
-        {new Date(allowance.resetsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.
+        {formatTimeOfDay(allowance.resetsAt)}.
       </p>
       <h2>Immersion time</h2>
       {languages.length === 0 ? (
@@ -79,7 +74,7 @@ function Home({ me }: { me: MeResponse }) {
           ))}
         </ul>
       )}
-      <SessionPanel />
+      <SessionPanel allowance={allowance} onSettled={onSessionSettled} />
       <p>
         <button onClick={() => void signOut()}>Sign out</button>
       </p>

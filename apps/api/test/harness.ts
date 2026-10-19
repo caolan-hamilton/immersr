@@ -53,6 +53,7 @@ export function fakeOutsideWorld(start = new Date("2026-10-19T12:00:00Z")) {
   };
   const steer = {
     failCreateCall: false,
+    failHangup: false,
     flagTopics: false,
   };
 
@@ -65,6 +66,7 @@ export function fakeOutsideWorld(start = new Date("2026-10-19T12:00:00Z")) {
         return { sdpAnswer: `answer-for:${sdpOffer}`, callId: `rtc_fake_${callCount}` };
       },
       async hangup(callId) {
+        if (steer.failHangup) throw new Error("fake OpenAI hangup failure");
         recorded.hangups.push(callId);
       },
       async moderate(text) {
