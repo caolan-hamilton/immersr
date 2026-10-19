@@ -24,7 +24,7 @@ This creates the `cdk-*` roles and asset bucket that every deploy uses.
 npx cdk deploy Immersr-ci
 ```
 
-Note the `DeployRoleArn` output. The role trusts only pushes to `main` on `caolan-hamilton/immersr`, and it can only assume the CDK bootstrap roles.
+Note the `DeployRoleArn` output. The role trusts only jobs on `caolan-hamilton/immersr` that run in the GitHub `prod` environment, and it can only assume the CDK bootstrap roles. (A job that names an environment gets an OIDC subject of `repo:<owner>/<repo>:environment:<name>`, not its branch ref.)
 
 > If your account already has a GitHub OIDC provider (`token.actions.githubusercontent.com`), this deploy fails with "already exists". In that case, delete the old provider, or ask for `CiStack` to import the existing one.
 
@@ -34,8 +34,21 @@ Note the `DeployRoleArn` output. The role trusts only pushes to `main` on `caola
 gh variable set AWS_DEPLOY_ROLE_ARN --body "<DeployRoleArn from step 3>"
 ```
 
-The workflow's deploy job is skipped until this variable exists. The workflow also uses a GitHub environment named `prod`, which is created automatically on the first deploy. You can add required reviewers to it later if you want a manual approval gate.
+The workflow's deploy job is skipped until this variable exists.
 
-## 5. Check it
+## 5. Restrict the `prod` environment to `main`
+
+The deploy role trusts the `prod` environment, so the environment itself must only accept deployments from `main`. Otherwise a workflow on any branch could name `prod` and deploy.
+
+```sh
+gh api -X PUT repos/caolan-hamilton/immersr/environments/prod \
+  -F "deployment_branch_policy[protected_branches]=false" \
+  -F "deployment_branch_policy[custom_branch_policies]=true"
+gh api -X POST repos/caolan-hamilton/immersr/environments/prod/deployment-branch-policies -f name=main -f type=branch
+```
+
+You can also add required reviewers to `prod` later if you want a manual approval gate before each deploy.
+
+## 6. Check it
 
 Push to `main`. Then open the `Url` output of `Immersr-prod` (shown in the workflow log, or by running `aws cloudformation describe-stacks --stack-name Immersr-prod --region eu-west-1`). The page should show "API healthy on **prod**".

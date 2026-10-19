@@ -28,7 +28,7 @@ pnpm typecheck
 Your own stage, deployed from your laptop (needs AWS credentials and the one-off bootstrap in [docs/setup/bootstrap.md](docs/setup/bootstrap.md)):
 
 ```sh
-pnpm deploy:dev      # deploys Immersr-dev-$USER and prints its Url
+pnpm deploy:dev      # deploys your Immersr-dev-<you> stack and prints its Url
 API_PROXY=<that Url> pnpm dev:web   # local Vite app talking to your dev API
 ```
 

@@ -22,7 +22,9 @@ export class CiStack extends Stack {
       assumedBy: new iam.WebIdentityPrincipal(provider.oidcProviderArn, {
         StringEquals: {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": `repo:${props.githubRepo}:ref:refs/heads/main`,
+          // A job that names a GitHub environment gets this subject instead of its branch ref. The `prod`
+          // environment only allows deployments from main (docs/setup/bootstrap.md), so this still means "main only".
+          "token.actions.githubusercontent.com:sub": `repo:${props.githubRepo}:environment:prod`,
         },
       }),
     });

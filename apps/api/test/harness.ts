@@ -7,9 +7,10 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
 import type { Deps } from "../src/lib/deps.ts";
 import type { HangupTarget, OutsideWorld } from "../src/lib/outside-world.ts";
 import { TABLE } from "../src/lib/table.ts";
+import { DYNAMODB_LOCAL_ENDPOINT } from "./dynamodb-local.ts";
 
 const client = new DynamoDBClient({
-  endpoint: process.env.DYNAMODB_ENDPOINT ?? "http://localhost:8000",
+  endpoint: DYNAMODB_LOCAL_ENDPOINT,
   region: "eu-west-1",
   credentials: { accessKeyId: "local", secretAccessKey: "local" },
 });

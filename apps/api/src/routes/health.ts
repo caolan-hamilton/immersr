@@ -3,12 +3,15 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "
 import type { HealthResponse } from "@immersr/shared";
 import type { Deps } from "../lib/deps.ts";
 import { json } from "../lib/http.ts";
+import { TABLE } from "../lib/table.ts";
 
 // GET /api/health: proves the deployed path web → CloudFront → API → Lambda → DynamoDB.
 export const health =
   (deps: Deps) =>
   async (_event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> => {
-    await deps.db.send(new GetCommand({ TableName: deps.tableName, Key: { PK: "HEALTH", SK: "HEALTH" } }));
+    await deps.db.send(
+      new GetCommand({ TableName: deps.tableName, Key: { [TABLE.partitionKey]: "HEALTH", [TABLE.sortKey]: "HEALTH" } }),
+    );
     const body: HealthResponse = {
       status: "ok",
       stage: deps.stage,
