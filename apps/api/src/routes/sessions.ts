@@ -29,6 +29,17 @@ export const createSession =
     }
     const { sdpOffer, language, level, topic } = parsed.data;
 
+    // Before anything is reserved or created, so a flagged Topic changes no usage.
+    try {
+      if ((await deps.world.openai.moderate(topic)).flagged) {
+        return json(422, { error: "That Topic can't be used. Please choose another Topic." });
+      }
+    } catch (err) {
+      // Fail closed: an unchecked Topic must not reach the Partner's instructions.
+      console.error("Moderating the Topic failed", err);
+      return json(502, { error: "Couldn't start the Session. Please try again." });
+    }
+
     const now = deps.world.clock.now();
     const endsAt = new Date(now.getTime() + MAX_SESSION_SECONDS * 1000);
     const sessionId = randomUUID();

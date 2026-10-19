@@ -60,6 +60,29 @@ describe("POST /api/sessions/{id}/end", () => {
     });
   });
 
+  it("hangs up before settling: a failed hang-up gives 502, leaves the Session active, and a retry settles", async () => {
+    const { fake, end, sessionId } = await start("unhung");
+    fake.clock.advance(2 * 60 * 1000);
+    fake.steer.failHangup = true;
+
+    const failed = await end(90);
+
+    expect(failed.statusCode).toBe(502);
+    expect(fake.recorded.hangups).toHaveLength(0);
+    expect(await item("LEARNER#unhung", `SESSION#${sessionId}`)).toMatchObject({ status: "active" });
+    expect((await item("LEARNER#unhung", "USAGE#2026-10-19"))?.reservedSeconds).toBe(900);
+    expect(await item("LEARNER#unhung", "IMMERSION#pt-PT")).toBeUndefined();
+
+    fake.steer.failHangup = false;
+    fake.clock.advance(60 * 1000);
+    const retried = await end(90);
+
+    expect(retried.statusCode).toBe(200);
+    expect(parseBody(retried)).toEqual({ chargedSeconds: 180, immersionSeconds: 90 });
+    expect(fake.recorded.hangups).toEqual(["rtc_fake_1"]);
+    expect((await item("LEARNER#unhung", "USAGE#2026-10-19"))?.reservedSeconds).toBe(180);
+  });
+
   it("never charges more than the reserved length", async () => {
     const { fake, end } = await start("overtimer");
     fake.clock.advance(40 * 60 * 1000);

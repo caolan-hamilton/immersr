@@ -132,6 +132,9 @@ export async function startSession(
       const refusal = SessionRefusal.safeParse(await response.json().catch(() => undefined));
       throw new SessionRefusedError(refusal.success ? refusal.data.reason : "global-cap");
     }
+    if (response.status === 422) {
+      throw new SessionStartError("That Topic can't be used. Please choose another Topic. Your other choices are kept.");
+    }
     if (!response.ok) throw new SessionStartError(`Couldn't start the Session (${response.status}).`);
     const created = CreateSessionResponse.parse(await response.json());
     await pc.setRemoteDescription({ type: "answer", sdp: created.sdpAnswer });

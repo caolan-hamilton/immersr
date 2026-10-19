@@ -23,7 +23,7 @@ interface Turn {
   text: string;
 }
 
-type Phase = "setup" | "connecting" | "live" | "ending";
+type Phase = "setup" | "connecting" | "live" | "ending" | "end-failed";
 
 const refusalMessage = (reason: SessionRefusedError["reason"], resetsAt: string) =>
   reason === "daily-allowance"
@@ -35,6 +35,8 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [summary, setSummary] = useState<EndSessionResponse>();
   const finishing = useRef(false);
+  // The Session the server hasn't settled yet, kept so a failed End can be retried.
+  const unsettled = useRef<{ sessionId: string; partnerSeconds: number } | undefined>(undefined);
   const [language, setLanguage] = useState<Language>("pt-PT");
   const [level, setLevel] = useState<Level>("A1");
   const [topic, setTopic] = useState("");
@@ -55,17 +57,29 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
     finishing.current = true;
     setPhase("ending");
     setDraft("");
-    const partnerSeconds = session.partnerSeconds();
+    unsettled.current = { sessionId: session.sessionId, partnerSeconds: session.partnerSeconds() };
     session.end();
     live.current = undefined;
+    await settleUnsettled();
+  };
+
+  // Asks the server to hang up and settle. On failure the Session stays active and charged, so offer a retry.
+  const settleUnsettled = async () => {
+    const pending = unsettled.current;
+    if (!pending) return;
+    setPhase("ending");
+    setError(undefined);
     try {
-      setSummary(await reportEnd(session.sessionId, partnerSeconds));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
+      setSummary(await reportEnd(pending.sessionId, pending.partnerSeconds));
+      unsettled.current = undefined;
       finishing.current = false;
       setPhase("setup");
       onSettled();
+    } catch (err) {
+      finishing.current = false;
+      const reason = err instanceof Error ? err.message : String(err);
+      setError(`${reason} The Session isn't settled yet, so your full allowance is still held. Please try again.`);
+      setPhase("end-failed");
     }
   };
   const finishRef = useRef(finish);
@@ -180,6 +194,11 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
         </p>
       )}
       {phase === "ending" && <p>Ending the Session…</p>}
+      {phase === "end-failed" && (
+        <p>
+          <button onClick={() => void settleUnsettled()}>Retry ending the Session</button>
+        </p>
+      )}
       {micBlocked && (
         <p role="alert">
           <span className="dot bad" /> Immersr can't use your microphone. Click the lock or camera icon in your browser's
