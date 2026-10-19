@@ -38,6 +38,12 @@ export function SessionPanel() {
           onPartnerDraft: setDraft,
           onTurn: (speaker, text) => setTurns((previous) => [...previous, { speaker, text }]),
           onError: setError,
+          onDisconnected: () => {
+            live.current = undefined;
+            setDraft("");
+            setError("The connection to the Partner was lost. The Session has ended.");
+            setPhase("setup");
+          },
         },
       );
       setPhase("live");

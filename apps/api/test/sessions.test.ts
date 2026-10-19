@@ -1,4 +1,4 @@
-import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CreateSessionResponse, LANGUAGES, LEVELS } from "@immersr/shared";
 import { buildInstructions, EXAMPLE_TURNS, LANGUAGE_SPECS, LEVEL_SPECS } from "../src/lib/instructions.ts";
@@ -81,7 +81,39 @@ describe("POST /api/sessions", () => {
     );
 
     expect(response.statusCode).toBe(502);
+    expect(await storedSessions("unlucky")).toHaveLength(0);
   });
+
+  it("hangs up the call and returns 502 when storing the Session fails", async () => {
+    const fake = fakeOutsideWorld();
+    // A table that doesn't exist makes the DynamoDB write fail for real.
+    const response = await createSession(testDeps(`missing-${table.tableName}`, fake))(
+      httpEvent({ method: "POST", path: "/api/sessions", body: valid, sub: "unstored", groups: ["admins"] }),
+    );
+
+    expect(response.statusCode).toBe(502);
+    expect(fake.recorded.createCalls).toHaveLength(1);
+    expect(fake.recorded.hangups).toEqual(["rtc_fake_1"]);
+    expect(await storedSessions("unstored")).toHaveLength(0);
+  });
+
+  it("does not hang up when the Session was stored", async () => {
+    const { response, fake } = await post(valid, { sub: "stored", groups: ["admins"] });
+
+    expect(response.statusCode).toBe(201);
+    expect(fake.recorded.hangups).toHaveLength(0);
+  });
+
+  async function storedSessions(sub: string) {
+    const result = await testDb.send(
+      new QueryCommand({
+        TableName: table.tableName,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+        ExpressionAttributeValues: { ":pk": `LEARNER#${sub}`, ":sk": "SESSION#" },
+      }),
+    );
+    return result.Items ?? [];
+  }
 });
 
 describe("buildInstructions", () => {

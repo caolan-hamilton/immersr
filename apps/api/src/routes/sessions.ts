@@ -43,24 +43,35 @@ export const createSession =
     }
 
     const sessionId = randomUUID();
-    await deps.db.send(
-      new PutCommand({
-        TableName: deps.tableName,
-        Item: {
-          [TABLE.partitionKey]: `LEARNER#${sub}`,
-          [TABLE.sortKey]: `SESSION#${sessionId}`,
-          sessionId,
-          callId: call.callId,
-          status: "active",
-          language,
-          level,
-          topic,
-          usageDay: usageDay(now),
-          startedAt: now.toISOString(),
-          endsAt: endsAt.toISOString(),
-        },
-      }),
-    );
+    try {
+      await deps.db.send(
+        new PutCommand({
+          TableName: deps.tableName,
+          Item: {
+            [TABLE.partitionKey]: `LEARNER#${sub}`,
+            [TABLE.sortKey]: `SESSION#${sessionId}`,
+            sessionId,
+            callId: call.callId,
+            status: "active",
+            language,
+            level,
+            topic,
+            usageDay: usageDay(now),
+            startedAt: now.toISOString(),
+            endsAt: endsAt.toISOString(),
+          },
+        }),
+      );
+    } catch (err) {
+      console.error("Storing the Session failed; hanging up the call", err);
+      // Nothing records this call, so nothing else could end it. Best effort: the 502 matters more.
+      try {
+        await deps.world.openai.hangup(call.callId);
+      } catch (hangupErr) {
+        console.error(`Hanging up orphaned call ${call.callId} failed`, hangupErr);
+      }
+      return json(502, { error: "Couldn't start the Session. Please try again." });
+    }
 
     const body: CreateSessionResponse = { sessionId, sdpAnswer: call.sdpAnswer, endsAt: endsAt.toISOString() };
     return json(201, body);

@@ -10,6 +10,8 @@ export interface SessionEvents {
   onPartnerDraft(text: string): void;
   onTurn(speaker: TurnSpeaker, text: string): void;
   onError(message: string): void;
+  /** The connection failed or closed without the Learner pressing End. */
+  onDisconnected(): void;
 }
 
 export class MicrophoneBlockedError extends Error {}
@@ -34,9 +36,16 @@ export async function startSession(
   const stopMic = () => mic.getTracks().forEach((track) => track.stop());
 
   const pc = new RTCPeerConnection();
+  let ending = false;
   const close = () => {
+    ending = true; // pc.close() fires no state event, but be explicit that this end was deliberate
     stopMic();
     pc.close();
+  };
+  pc.onconnectionstatechange = () => {
+    if (ending || (pc.connectionState !== "failed" && pc.connectionState !== "closed")) return;
+    close();
+    events.onDisconnected();
   };
 
   try {
