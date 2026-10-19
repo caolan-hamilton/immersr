@@ -1,0 +1,68 @@
+name: Claude PR review
+
+# Claude reviews every non-draft pull request, and reviews again on each new push.
+# Setup: install the Claude GitHub app on this repo (https://github.com/apps/claude) and add ONE secret:
+#   CLAUDE_CODE_OAUTH_TOKEN  (Pro/Max subscription, from `claude setup-token`), or
+#   ANTHROPIC_API_KEY        (pay-per-use API billing)
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true # a newer push supersedes an in-flight review
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            You are reviewing a pull request for Immersr, a language-immersion web app.
+
+            Before reviewing, read:
+            - CLAUDE.md, GLOSSARY.md and the ADRs in docs/adr/.
+            - The PR description (`gh pr view`), and every issue it closes or references (`gh issue view <n>`),
+              including the parent spec (#1). The ticket's acceptance criteria are the definition of done.
+
+            Review the diff (`gh pr diff`) for, in priority order:
+            1. Correctness bugs: wrong behaviour, unhandled failures, race conditions, off-by-one errors and
+               UTC day boundaries in the Reservation and settlement logic.
+            2. Security and cost: anything that lets a Learner or the browser exceed the Daily allowance,
+               the global cap or the maximum Session length; secrets in code; IAM broader than needed;
+               anything with a fixed monthly AWS cost.
+            3. Spec fit: acceptance criteria that are missing or only partly met, and contradictions with an ADR
+               (say which ADR).
+            4. Tests: the default test seam is the API routes (handlers + DynamoDB Local + faked outside world).
+               Flag behaviour the ticket requires that has no test, and tests that assert on internals
+               rather than behaviour.
+            5. Vocabulary: domain names that drift from GLOSSARY.md terms (for example "user" instead of "Learner").
+
+            Rules:
+            - Only comment on real problems, with a concrete failure scenario. Skip style nits, formatting and
+              personal preferences.
+            - Put specific issues as inline comments on the exact lines. Finish with one top-level summary:
+              a verdict (ready to merge / needs changes), each acceptance criterion as met or not met,
+              and anything you couldn't verify.
+            - Don't push commits or approve the PR. Only comment.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*),Read,Glob,Grep"

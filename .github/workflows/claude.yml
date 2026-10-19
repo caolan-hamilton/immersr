@@ -1,0 +1,71 @@
+name: Claude
+
+# Mention @claude in an issue or PR comment to hand Claude a task, for example on a ticket:
+#   "@claude implement this ticket"
+# Claude works on a branch and opens a PR. CI and the Claude PR review then run, and a human merges.
+# Only the repo owner and collaborators can trigger it (this is a public repo).
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: |
+      (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
+      ) && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+        github.event.comment.author_association || github.event.review.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read # lets Claude read CI results on PRs
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports: ["8000:8000"]
+    env:
+      DYNAMODB_ENDPOINT: http://localhost:8000
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --allowedTools "Bash(pnpm:*),Bash(git:*),Bash(gh issue view:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr create:*),Bash(gh pr comment:*),Bash(gh run view:*),Bash(gh run list:*),Read,Edit,Write,Glob,Grep"
+            --append-system-prompt "You are working on Immersr, a language-immersion web app.
+            Before changing code, read CLAUDE.md, GLOSSARY.md, the ADRs in docs/adr/, and the issue you were asked about
+            (gh issue view), plus its parent spec #1. A ticket's acceptance criteria are the definition of done.
+            Use glossary terms in names (Learner, Partner, Session, Turn, Reservation, Daily allowance, and so on).
+            Tests go through the API seam: route handlers + DynamoDB Local + faked outside world (apps/api/test/harness.ts).
+            Only pure functions with many input combinations get direct unit tests.
+            Before you finish, run pnpm typecheck, pnpm test and pnpm synth, and fix anything that fails.
+            When implementing a ticket, open a PR whose body starts with 'Closes #<issue>' and lists each acceptance criterion
+            as met or not met, plus anything you could not verify (for example live audio or AWS behaviour).
+            If the ticket needs a manual step from the owner that isn't done yet (for example creating a Google OAuth client
+            or storing a secret in AWS), stop and say so in a comment instead of guessing.
+            Never deploy, never change infra/lib/ci-stack.ts or the GitHub workflows, and never add secrets to code."
