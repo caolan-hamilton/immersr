@@ -50,10 +50,12 @@ export function fakeOutsideWorld(start = new Date("2026-10-19T12:00:00Z")) {
     moderated: [] as string[],
     schedules: [] as { target: HangupTarget; at: Date }[],
     translations: [] as { text: string; language: string }[],
+    deletedUsers: [] as string[],
   };
   const steer = {
     failCreateCall: false,
     failHangup: false,
+    failDeleteUser: false,
     flagTopics: false,
   };
 
@@ -83,6 +85,12 @@ export function fakeOutsideWorld(start = new Date("2026-10-19T12:00:00Z")) {
       async toEnglish(text, language) {
         recorded.translations.push({ text, language });
         return `[en] ${text}`;
+      },
+    },
+    identity: {
+      async deleteUser(sub) {
+        if (steer.failDeleteUser) throw new Error("fake Cognito failure");
+        recorded.deletedUsers.push(sub);
       },
     },
     clock: { now: () => now },

@@ -1,3 +1,8 @@
+import {
+  AdminDeleteUserCommand,
+  CognitoIdentityProviderClient,
+  UserNotFoundException,
+} from "@aws-sdk/client-cognito-identity-provider";
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { OPENAI_API_KEY_PARAMETER } from "./openai-key.ts";
 
@@ -20,6 +25,10 @@ export interface OutsideWorld {
   };
   translate: {
     toEnglish(text: string, language: string): Promise<string>;
+  };
+  identity: {
+    /** Deletes the Learner's Cognito user. A user that is already gone counts as success. */
+    deleteUser(sub: string): Promise<void>;
   };
   clock: {
     now(): Date;
@@ -85,6 +94,19 @@ async function moderate(text: string) {
   return { flagged };
 }
 
+async function deleteUser(sub: string) {
+  const userPoolId = process.env.USER_POOL_ID;
+  if (!userPoolId) throw new Error("Missing environment variable USER_POOL_ID");
+  try {
+    // Cognito's admin APIs accept the `sub` in place of the (provider-prefixed) username.
+    await new CognitoIdentityProviderClient({}).send(
+      new AdminDeleteUserCommand({ UserPoolId: userPoolId, Username: sub }),
+    );
+  } catch (err) {
+    if (!(err instanceof UserNotFoundException)) throw err;
+  }
+}
+
 // Real clients are added by the tickets that first need them.
 export function productionOutsideWorld(): OutsideWorld {
   return {
@@ -95,6 +117,7 @@ export function productionOutsideWorld(): OutsideWorld {
     },
     scheduler: { scheduleHangup: notYetBuilt("scheduler.scheduleHangup", "#6") },
     translate: { toEnglish: notYetBuilt("translate.toEnglish", "#8") },
+    identity: { deleteUser },
     clock: { now: () => new Date() },
   };
 }
