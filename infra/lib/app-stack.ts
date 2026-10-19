@@ -1,31 +1,20 @@
 import { fileURLToPath } from "node:url";
-import {
-  CfnDynamicReference,
-  CfnDynamicReferenceService,
-  CfnOutput,
-  Duration,
-  RemovalPolicy,
-  SecretValue,
-  Stack,
-  Token,
-  type StackProps,
-} from "aws-cdk-lib";
+import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from "aws-cdk-lib";
 import * as apigw from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpJwtAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
-import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
-import * as ssm from "aws-cdk-lib/aws-ssm";
 import type { Construct } from "constructs";
 import { TABLE } from "@immersr/api/table";
 import type { WebConfig } from "@immersr/shared";
+import { Auth } from "./auth.ts";
 
 const path = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -117,44 +106,11 @@ export class AppStack extends Stack {
       },
     });
 
-    // Sign in with Google only (ADR 0003): Google is the sole identity provider, through Cognito's managed login.
-    const userPool = new cognito.UserPool(this, "Users", {
-      selfSignUpEnabled: true,
-      signInAliases: { email: true },
-      removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    const { userPool, userPoolClient, userPoolDomain } = new Auth(this, "Auth", {
+      stage: props.stage,
+      isProd,
+      siteUrl: `https://${distribution.distributionDomainName}`,
     });
-    new cognito.CfnUserPoolGroup(this, "AdminsGroup", {
-      userPoolId: userPool.userPoolId,
-      groupName: "admins",
-      description: "Owner: higher Daily allowance",
-    });
-    // The client ID and secret were stored in SSM by hand (docs/setup/google-sign-in.md). CloudFormation's
-    // ssm-secure references don't work for identity providers, so the secret is a plain String resolved at deploy.
-    const google = new cognito.UserPoolIdentityProviderGoogle(this, "Google", {
-      userPool,
-      clientId: ssm.StringParameter.valueForStringParameter(this, "/immersr/google-oauth/client-id"),
-      // A {{resolve:ssm:...}} dynamic reference, so the value never appears in the template or stack parameters.
-      clientSecretValue: SecretValue.unsafePlainText(
-        Token.asString(new CfnDynamicReference(CfnDynamicReferenceService.SSM, "/immersr/google-oauth/client-secret")),
-      ),
-      scopes: ["openid", "email", "profile"],
-      attributeMapping: { email: cognito.ProviderAttribute.GOOGLE_EMAIL },
-    });
-    // The prefix is registered in Google as a redirect URI, so it must match exactly: immersr-prod, immersr-dev-<user>.
-    const userPoolDomain = userPool.addDomain("Domain", { cognitoDomain: { domainPrefix: `immersr-${props.stage}` } });
-    const siteUrl = `https://${distribution.distributionDomainName}`;
-    const userPoolClient = userPool.addClient("WebClient", {
-      generateSecret: false,
-      supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.GOOGLE],
-      oAuth: {
-        flows: { authorizationCodeGrant: true },
-        scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
-        callbackUrls: [siteUrl, "http://localhost:5173"],
-        logoutUrls: [siteUrl, "http://localhost:5173"],
-      },
-      refreshTokenValidity: Duration.days(30),
-    });
-    userPoolClient.node.addDependency(google);
 
     const authorizer = new HttpJwtAuthorizer("Jwt", userPool.userPoolProviderUrl, {
       jwtAudience: [userPoolClient.userPoolClientId],
