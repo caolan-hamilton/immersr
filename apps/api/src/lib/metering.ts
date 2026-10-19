@@ -1,9 +1,9 @@
 // Reserve-then-settle metering (ADR 0004, ADR 0006). Every function here is one DynamoDB transaction.
-import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { TransactionCanceledException } from "@aws-sdk/client-dynamodb";
+import { GetCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { ConditionalCheckFailedException, TransactionCanceledException } from "@aws-sdk/client-dynamodb";
 import type { SessionRefusal } from "@immersr/shared";
 import type { Deps } from "./deps.ts";
-import { GLOBAL_DAILY_CAP_SECONDS, MAX_SESSION_SECONDS, USAGE_TTL_SECONDS } from "./limits.ts";
+import { DAILY_TRANSLATION_LIMIT, GLOBAL_DAILY_CAP_SECONDS, MAX_SESSION_SECONDS, USAGE_TTL_SECONDS } from "./limits.ts";
 import { usageDay } from "./learner.ts";
 import { TABLE } from "./table.ts";
 
@@ -169,6 +169,39 @@ export async function settle(
     }
     throw err;
   }
+}
+
+/** Counts one translation on the Learner's usage item for `now`'s UTC day; false once the daily limit is reached. */
+export async function takeTranslation(deps: Deps, sub: string, now: Date): Promise<boolean> {
+  const day = usageDay(now);
+  try {
+    await deps.db.send(
+      new UpdateCommand({
+        TableName: deps.tableName,
+        Key: usageKey(learnerKey(sub), day),
+        UpdateExpression: "ADD translationCount :one SET #ttl = :ttl",
+        ConditionExpression: "attribute_not_exists(translationCount) OR translationCount < :limit",
+        ExpressionAttributeNames: { "#ttl": TTL },
+        ExpressionAttributeValues: { ":one": 1, ":limit": DAILY_TRANSLATION_LIMIT, ":ttl": usageTtl(day) },
+      }),
+    );
+    return true;
+  } catch (err) {
+    if (err instanceof ConditionalCheckFailedException) return false;
+    throw err;
+  }
+}
+
+/** Gives back a translation that was counted but never delivered. */
+export async function releaseTranslation(deps: Deps, sub: string, now: Date): Promise<void> {
+  await deps.db.send(
+    new UpdateCommand({
+      TableName: deps.tableName,
+      Key: usageKey(learnerKey(sub), usageDay(now)),
+      UpdateExpression: "ADD translationCount :minusOne",
+      ExpressionAttributeValues: { ":minusOne": -1 },
+    }),
+  );
 }
 
 export async function getSession(deps: Deps, sub: string, sessionId: string): Promise<SessionItem | undefined> {

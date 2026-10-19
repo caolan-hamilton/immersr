@@ -1,3 +1,4 @@
+import { TranslateClient, TranslateTextCommand } from "@aws-sdk/client-translate";
 import {
   ActionAfterCompletion,
   CreateScheduleCommand,
@@ -91,6 +92,20 @@ async function moderate(text: string) {
   return { flagged };
 }
 
+let translateClient: TranslateClient | undefined;
+
+// Amazon Translate takes "pt-PT" as is, but only a bare language code for Spanish and French.
+const translateCode = (language: string) => (language === "pt-PT" ? language : language.split("-")[0]!);
+
+async function toEnglish(text: string, language: string) {
+  translateClient ??= new TranslateClient({});
+  const out = await translateClient.send(
+    new TranslateTextCommand({ Text: text, SourceLanguageCode: translateCode(language), TargetLanguageCode: "en" }),
+  );
+  if (!out.TranslatedText) throw new Error("Amazon Translate returned no translation");
+  return out.TranslatedText;
+}
+
 const requireEnv = (name: string): string => {
   const value = process.env[name];
   if (!value) throw new Error(`Missing environment variable ${name}`);
@@ -125,7 +140,7 @@ export function productionOutsideWorld(): OutsideWorld {
       moderate,
     },
     scheduler: { scheduleHangup },
-    translate: { toEnglish: notYetBuilt("translate.toEnglish", "#8") },
+    translate: { toEnglish },
     clock: { now: () => new Date() },
   };
 }
