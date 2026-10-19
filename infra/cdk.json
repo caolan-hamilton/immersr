@@ -1,7 +1,7 @@
 {
   "app": "npx tsx bin/app.ts",
   "context": {
-    "githubRepo": "caolan-hamilton/immersr",
+    "githubOidcSubjectPrefix": "repo:caolan-hamilton@163114028/immersr@1425697661",
     "@aws-cdk/aws-signer:signingProfileNamePassedToCfn": true,
     "@aws-cdk/core:newStyleStackSynthesis": true,
     "@aws-cdk/core:stackRelativeExports": true,

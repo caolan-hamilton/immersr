@@ -3,7 +3,12 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import type { Construct } from "constructs";
 
 interface CiStackProps extends StackProps {
-  githubRepo: string;
+  /**
+   * The repo part of GitHub's OIDC `sub` claim. This repo uses GitHub's immutable subject format,
+   * `repo:<owner>@<owner id>/<repo>@<repo id>`, so a renamed or recreated repo can't take over the role.
+   * Read it with: gh api repos/<owner>/<repo>/actions/oidc/customization/sub -q .sub_claim_prefix
+   */
+  githubOidcSubjectPrefix: string;
 }
 
 // GitHub OIDC → IAM role, so GitHub Actions deploys with no stored AWS keys.
@@ -24,7 +29,7 @@ export class CiStack extends Stack {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
           // A job that names a GitHub environment gets this subject instead of its branch ref. The `prod`
           // environment only allows deployments from main (docs/setup/bootstrap.md), so this still means "main only".
-          "token.actions.githubusercontent.com:sub": `repo:${props.githubRepo}:environment:prod`,
+          "token.actions.githubusercontent.com:sub": `${props.githubOidcSubjectPrefix}:environment:prod`,
         },
       }),
     });
