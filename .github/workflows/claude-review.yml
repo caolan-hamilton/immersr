@@ -1,9 +1,9 @@
 name: Claude PR review
 
 # Claude reviews every non-draft pull request, and reviews again on each new push.
-# Setup: install the Claude GitHub app on this repo (https://github.com/apps/claude) and add ONE secret:
-#   CLAUDE_CODE_OAUTH_TOKEN  (Pro/Max subscription, from `claude setup-token`), or
-#   ANTHROPIC_API_KEY        (pay-per-use API billing)
+# Setup: install the Claude GitHub app on this repo (https://github.com/apps/claude) and add the secret
+# CLAUDE_CODE_OAUTH_TOKEN (Pro/Max subscription, from `claude setup-token`). Pass only one credential:
+# an empty ANTHROPIC_API_KEY input takes precedence and makes every run fail authentication.
 
 on:
   pull_request:
@@ -31,7 +31,6 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           track_progress: true
           prompt: |
             REPO: ${{ github.repository }}
