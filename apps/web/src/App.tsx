@@ -4,6 +4,8 @@ import { Account } from "./Account.tsx";
 import { Home } from "./Home.tsx";
 import { Landing } from "./Landing.tsx";
 import { AppLoader } from "./Loading.tsx";
+import { Offline } from "./Offline.tsx";
+import { useOnline } from "./online.ts";
 import { Privacy } from "./Privacy.tsx";
 import { BottomNav, TopBar } from "./Nav.tsx";
 import { SessionPanel } from "./SessionPanel.tsx";
@@ -46,6 +48,16 @@ export function App() {
       .then(setState)
       .catch((err: unknown) => setState({ kind: "error", message: err instanceof Error ? err.message : String(err) }));
   }, []);
+
+  // A live Session keeps its own screen even if the connection blips; everywhere else offline gets the friendly screen.
+  const online = useOnline();
+  if (!online && !(state.kind === "home" && screen === "session")) {
+    return (
+      <div style={themeVars(theme)}>
+        <Offline color={theme.body} />
+      </div>
+    );
+  }
 
   return (
     <div style={themeVars(theme)} className="min-h-dvh bg-bg font-sans text-ink">
