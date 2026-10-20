@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.14.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
@@ -13,6 +15,7 @@
     "synth": "pnpm build:web && pnpm --filter @immersr/infra cdk synth",
     "deploy:dev": "pnpm build:web && pnpm --filter @immersr/infra cdk deploy \"Immersr-dev-*\"",
     "drift-check": "pnpm --filter @immersr/api drift-check",
-    "dev:web": "pnpm --filter @immersr/web dev"
+    "dev:web": "pnpm --filter @immersr/web dev",
+    "prototype:ui": "pnpm --filter @immersr/web prototype"
   }
 }
