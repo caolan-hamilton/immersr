@@ -104,7 +104,10 @@ export const STREAK_SORT_KEY = "STREAK";
  * day again, or a released Session. The condition guards against two Sessions settling at once.
  */
 function streakUpdate(deps: Deps, sub: string, session: SessionItem, outcome: Outcome, stored: Record<string, unknown> | undefined) {
-  if (outcome === "released" || stored?.lastDay === session.localDay) return [];
+  // Nothing to record for a released Session, a Session from before `localDay` existed, the same local day
+  // again, or an earlier local day than the stored one (the Learner travelled west, or Sessions settled out of order).
+  if (outcome === "released" || !session.localDay) return [];
+  if (typeof stored?.lastDay === "string" && session.localDay <= stored.lastDay) return [];
   const continues = stored?.lastDay === previousDay(session.localDay);
   const count = continues ? Number(stored?.count ?? 0) + 1 : 1;
   return [

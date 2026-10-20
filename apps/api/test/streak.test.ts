@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { deleteMe } from "../src/routes/delete-me.ts";
 import { hangUp } from "../src/routes/hang-up.ts";
 import { endSession } from "../src/routes/end-session.ts";
 import { me } from "../src/routes/me.ts";
@@ -29,6 +30,7 @@ describe("Streak", () => {
     expect(response.statusCode).toBe(201);
     const { sessionId } = parseBody(response);
     return {
+      sessionId: sessionId as string,
       end: () =>
         endSession(deps)(
           httpEvent({ method: "POST", path: `/api/sessions/${sessionId}/end`, pathParameters: { id: sessionId }, body: { partnerSeconds: 10 }, sub }),
@@ -103,5 +105,44 @@ describe("Streak", () => {
     await (await start("nowhere", "2026-10-19T23:30:00Z", "Mars/Olympus_Mons")).end();
     await (await start("nowhere", "2026-10-20T00:30:00Z", "Mars/Olympus_Mons")).end();
     expect(await streakAt("nowhere", "2026-10-20T01:00:00Z", "Mars/Olympus_Mons")).toBe(2);
+  });
+
+  it("never moves the Streak back to an earlier local day", async () => {
+    await (await start("traveller", "2026-10-19T12:00:00Z", "Asia/Tokyo")).end();
+    await (await start("traveller", "2026-10-20T12:00:00Z", "Asia/Tokyo")).end();
+    // 05:00 UTC on the 20th is still the 19th in Pago Pago (18:00), an earlier local day than the Streak's last day.
+    await (await start("traveller", "2026-10-20T05:00:00Z", "Pacific/Pago_Pago")).end();
+    expect(await streakAt("traveller", "2026-10-20T13:00:00Z", "Asia/Tokyo")).toBe(2);
+  });
+
+  it("settles a Session that started before local days were recorded", async () => {
+    await (await start("old-timer", "2026-10-19T12:00:00Z")).end();
+    const s = await start("old-timer", "2026-10-20T12:00:00Z");
+    const key = { PK: "LEARNER#old-timer", SK: `SESSION#${s.sessionId}` };
+    const active = (await testDb.send(new GetCommand({ TableName: table.tableName, Key: key }))).Item!;
+    delete active.localDay;
+    await testDb.send(new PutCommand({ TableName: table.tableName, Item: active }));
+    expect((await s.end()).statusCode).toBe(200);
+    expect(await streakAt("old-timer", "2026-10-20T13:00:00Z")).toBe(1);
+  });
+
+  it("counts once when two Sessions settle at the same moment", async () => {
+    const a = await start("racer", "2026-10-19T12:00:00Z");
+    const b = await start("racer", "2026-10-19T12:00:01Z");
+    const [first, second] = await Promise.all([a.end(), b.end()]);
+    expect([first.statusCode, second.statusCode]).toEqual([200, 200]);
+    expect(await streakAt("racer", "2026-10-19T13:00:00Z")).toBe(1);
+  });
+
+  it("erases the Streak with the Learner", async () => {
+    await (await start("leaver", "2026-10-19T12:00:00Z")).end();
+    const key = { PK: "LEARNER#leaver", SK: "STREAK" };
+    const read = () => testDb.send(new GetCommand({ TableName: table.tableName, Key: key, ConsistentRead: true }));
+    expect((await read()).Item).toBeDefined();
+    const response = await deleteMe(testDeps(table.tableName, fakeOutsideWorld()))(
+      httpEvent({ method: "DELETE", path: "/api/me", sub: "leaver" }),
+    );
+    expect(response.statusCode).toBe(204);
+    expect((await read()).Item).toBeUndefined();
   });
 });

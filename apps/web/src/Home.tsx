@@ -33,7 +33,7 @@ export function Home({ me, language, onLanguageChange, onStartSession }: HomePro
               strokeLinejoin="round"
             />
           </svg>
-          {me.streak}-day streak
+          {me.streak === 0 ? "No streak yet" : `${me.streak}-day streak`}
         </span>
       </header>
       <div className="flex grow flex-col gap-3.5 px-5 pt-[18px]">
