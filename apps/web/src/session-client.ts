@@ -91,7 +91,11 @@ export async function startSession(
 ): Promise<LiveSession> {
   let mic: MediaStream;
   try {
-    mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // The browser's own clean-up runs before turn detection sees the audio, so coughs, taps and
+    // the Partner's voice leaking from speakers are less likely to count as the Learner speaking.
+    mic = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
   } catch (err) {
     throw new MicrophoneBlockedError(err instanceof Error ? err.message : String(err));
   }

@@ -41,6 +41,7 @@ describe("POST /api/sessions", () => {
       audio: {
         input: {
           transcription: { model: "gpt-4o-mini-transcribe" },
+          noise_reduction: { type: "far_field" },
           turn_detection: { type: "semantic_vad", eagerness: "low", interrupt_response: true },
         },
         output: { voice: "cedar", speed: 0.9 },
@@ -210,6 +211,13 @@ describe("buildInstructions", () => {
     expect(instructions).toContain(EXAMPLE_TURNS[language][level]);
     expect(instructions).toContain(LEVEL_SPECS[level].spec);
     expect(instructions).toContain("«cooking»");
+  });
+
+  it.each(LANGUAGES)("tells the %s Partner to resume, not change topic, after a noise interrupts it", (language) => {
+    const instructions = buildInstructions({ language, level: "A1", topic: "cooking" });
+
+    expect(instructions).toContain("# When you are cut off by a noise");
+    expect(instructions).toContain(`continue in ${LANGUAGE_SPECS[language].name} exactly where you stopped`);
   });
 
   it("has the speed from the Level", () => {
