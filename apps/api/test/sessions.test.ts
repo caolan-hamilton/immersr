@@ -97,6 +97,7 @@ describe("POST /api/sessions", () => {
     expect(await item("LEARNER#reserver", `SESSION#${sessionId}`)).toMatchObject({
       status: "active",
       usageDay: "2026-10-19",
+      localDay: "2026-10-19",
       reservedSeconds: 900,
     });
   });

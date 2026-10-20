@@ -163,7 +163,11 @@ export async function startSession(
 
     const token = await getIdToken();
     if (!token) throw new SessionStartError("You've been signed out. Please sign in again.");
-    const request: CreateSessionRequest = { ...choice, sdpOffer: offer.sdp ?? "" };
+    const request: CreateSessionRequest = {
+      ...choice,
+      sdpOffer: offer.sdp ?? "",
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
     const response = await fetch("/api/sessions", {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },

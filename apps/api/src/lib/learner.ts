@@ -29,3 +29,23 @@ export const usageDay = (now: Date) => now.toISOString().slice(0, 10);
 /** The next UTC midnight after `now`, when the Daily allowance resets. */
 export const nextUtcMidnight = (now: Date) =>
   new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+
+const isValidTimeZone = (timeZone: string) => {
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** The Learner's calendar day (YYYY-MM-DD) at `now` in `timeZone`; UTC when the time zone is missing or invalid. */
+export function localDay(now: Date, timeZone: string | undefined): string {
+  if (!timeZone || !isValidTimeZone(timeZone)) return usageDay(now);
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+/** The calendar day before `day` (YYYY-MM-DD). */
+export const previousDay = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);

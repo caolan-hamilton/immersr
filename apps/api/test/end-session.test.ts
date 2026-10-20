@@ -188,6 +188,7 @@ describe("POST /api/sessions/{id}/end", () => {
     expect(parseBody(response)).toEqual({
       allowance: { usedSeconds: 180, limitSeconds: 900, resetsAt: "2026-10-20T00:00:00.000Z" },
       immersion: { "pt-PT": 150 },
+      streak: 1,
     });
   });
 });
