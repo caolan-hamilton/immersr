@@ -37,7 +37,16 @@ const refusalMessage = (reason: SessionRefusedError["reason"], resetsAt: string)
     ? `You've used all of today's allowance. It resets at ${formatTimeOfDay(resetsAt)}.`
     : "Immersr has reached its capacity for today, so no new Sessions can start right now. This isn't your own allowance. Please try again tomorrow.";
 
-export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["allowance"]; onSettled(): void }) {
+interface SessionPanelProps {
+  allowance: MeResponse["allowance"];
+  language: Language;
+  onLanguageChange(language: Language): void;
+  onSettled(): void;
+  /** Tells the screen shell whether a Session is connecting, live or being ended, so it can stay put. */
+  onBusyChange(busy: boolean): void;
+}
+
+export function SessionPanel({ allowance, language, onLanguageChange, onSettled, onBusyChange }: SessionPanelProps) {
   const remaining = Math.max(0, allowance.limitSeconds - allowance.usedSeconds);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [summary, setSummary] = useState<EndSessionResponse>();
@@ -46,7 +55,6 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
   // Also saved on the device, so it survives a closed tab or a reload.
   const unsettled = useRef<PendingEnd | undefined>(loadPendingEnd());
   const retrying = useRef(false);
-  const [language, setLanguage] = useState<Language>("pt-PT");
   const [level, setLevel] = useState<Level>("A1");
   const [topic, setTopic] = useState("");
   const [phase, setPhase] = useState<Phase>("setup");
@@ -93,6 +101,8 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
       window.removeEventListener("pageshow", dropIfStillLive);
     };
   }, []);
+
+  useEffect(() => onBusyChange(phase !== "setup"), [phase]);
 
   // Closes the connection, then has the server hang up and settle. Safe to call twice (End, countdown, drop).
   const finish = async () => {
@@ -208,7 +218,7 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
   };
 
   return (
-    <>
+    <div className="session-panel">
       <h2>Talk to the Partner</h2>
       {phase === "setup" && summary && (
         <p role="status">
@@ -232,7 +242,7 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
           <p>
             <label>
               Language{" "}
-              <select value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
+              <select value={language} onChange={(e) => onLanguageChange(e.target.value as Language)}>
                 {LANGUAGES.map((code) => (
                   <option key={code} value={code}>
                     {languageName(code)} ({code})
@@ -322,6 +332,6 @@ export function SessionPanel({ allowance, onSettled }: { allowance: MeResponse["
           )}
         </ul>
       )}
-    </>
+    </div>
   );
 }
