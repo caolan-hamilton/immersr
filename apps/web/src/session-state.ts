@@ -45,10 +45,21 @@ export interface SessionState {
   draft: string;
   /** By Turn index. A Turn with no entry has never been asked for. */
   translations: Record<number, TurnTranslationState>;
+  /** The Learner's microphone is off; the Partner carries on. */
+  muted: boolean;
+  /** The Partner is silenced and the microphone is off; Session time keeps running. */
+  paused: boolean;
+  /** The Transcript is hidden. Remembered on this device by the screen, not by the reducer. */
+  listeningMode: boolean;
 }
 
 export type SessionEvent =
   | { kind: "reset" }
+  | { kind: "mute" }
+  | { kind: "unmute" }
+  | { kind: "pause" }
+  | { kind: "resume" }
+  | { kind: "toggle-listening-mode" }
   | { kind: "realtime"; type: string }
   | { kind: "partner-draft"; text: string }
   | { kind: "turn"; speaker: TurnSpeaker; text: string }
@@ -57,7 +68,12 @@ export type SessionEvent =
   | { kind: "translation-failed"; index: number; message: string };
 
 /** Before the first event the Partner state is thinking: the Partner opens the Session. */
-export const initialSessionState: SessionState = { partner: "thinking", turns: [], draft: "", translations: {} };
+export const initialSessionState: SessionState = { partner: "thinking", turns: [], draft: "",
+  translations: {},
+  muted: false,
+  paused: false,
+  listeningMode: false,
+};
 
 /** Whether tapping this Turn needs a translation request: it was never asked for, or the last try failed. */
 export const needsTranslation = (state: SessionState, index: number) => {
@@ -68,8 +84,22 @@ export const needsTranslation = (state: SessionState, index: number) => {
 export function sessionReducer(state: SessionState, event: SessionEvent): SessionState {
   switch (event.kind) {
     case "reset":
-      return initialSessionState;
+      // Listening mode is a standing preference of the Learner; everything else starts afresh.
+      return { ...initialSessionState, listeningMode: state.listeningMode };
+    case "mute":
+      return state.muted ? state : { ...state, muted: true };
+    case "unmute":
+      return state.muted ? { ...state, muted: false } : state;
+    case "pause":
+      return state.paused ? state : { ...state, paused: true, draft: "" };
+    case "resume":
+      // The Partner is asked to carry on, so a reply is coming.
+      return state.paused ? { ...state, paused: false, partner: "thinking" } : state;
+    case "toggle-listening-mode":
+      return { ...state, listeningMode: !state.listeningMode };
     case "realtime": {
+      // Events still arrive while paused (a cancelled response winding down); the Partner state stays put.
+      if (state.paused) return state;
       const partner = PARTNER_STATE_BY_REALTIME_EVENT[event.type];
       if (!partner || partner === state.partner) return state;
       if (state.partner === "speaking" && YIELDS_TO_SPEAKING.has(event.type)) return state;
