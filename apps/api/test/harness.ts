@@ -109,8 +109,12 @@ export function fakeOutsideWorld(start = new Date("2026-10-19T12:00:00Z")) {
   };
 }
 
-export function testDeps(tableName: string, fake: FakeWorld = fakeOutsideWorld()): Deps {
-  return { db, tableName, stage: "test", world: fake.world };
+export function testDeps(
+  tableName: string,
+  fake: FakeWorld = fakeOutsideWorld(),
+  { sessionsAdminsOnly = true }: { sessionsAdminsOnly?: boolean } = {},
+): Deps {
+  return { db, tableName, stage: "test", world: fake.world, sessionsAdminsOnly };
 }
 
 interface EventInput {

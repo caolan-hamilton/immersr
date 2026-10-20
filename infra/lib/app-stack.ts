@@ -76,6 +76,11 @@ export class AppStack extends Stack {
       );
     }
 
+    // Amazon Translate is called with the Lambda's own IAM role: there is no key to store.
+    const translationsFn = fn("TranslationsFn", "translations.ts");
+    table.grantReadWriteData(translationsFn);
+    translationsFn.addToRolePolicy(new iam.PolicyStatement({ actions: ["translate:TranslateText"], resources: ["*"] }));
+
     // Each Session gets a one-time schedule, set to delete itself, that invokes the hang-up Lambda at the
     // maximum Session length.
     const scheduleGroup = new scheduler.CfnScheduleGroup(this, "HangUpSchedules");
@@ -180,6 +185,13 @@ export class AppStack extends Stack {
       path: "/api/sessions/{id}/end",
       methods: [apigw.HttpMethod.POST],
       integration: new HttpLambdaIntegration("EndSessionIntegration", endSessionFn),
+      authorizer,
+    });
+
+    api.addRoutes({
+      path: "/api/translations",
+      methods: [apigw.HttpMethod.POST],
+      integration: new HttpLambdaIntegration("TranslationsIntegration", translationsFn),
       authorizer,
     });
 

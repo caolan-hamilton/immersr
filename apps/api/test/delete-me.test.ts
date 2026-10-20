@@ -29,7 +29,7 @@ describe("DELETE /api/me", () => {
     deleteMe(testDeps(table.tableName, fake))(httpEvent({ method: "DELETE", path: "/api/me", sub }));
 
   async function startSession(sub: string, fake = fakeOutsideWorld()) {
-    const response = await createSession(testDeps(table.tableName, fake))(
+    const response = await createSession(testDeps(table.tableName, fake, { sessionsAdminsOnly: false }))(
       httpEvent({
         method: "POST",
         path: "/api/sessions",

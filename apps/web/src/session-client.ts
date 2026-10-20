@@ -4,8 +4,10 @@ import {
   CreateSessionResponse,
   EndSessionResponse,
   SessionRefusal,
+  TranslateResponse,
   type CreateSessionRequest,
   type EndSessionRequest,
+  type TranslateRequest,
 } from "@immersr/shared";
 import { getIdToken } from "./auth.ts";
 
@@ -66,13 +68,34 @@ export async function reportEnd(sessionId: string, partnerSeconds: number): Prom
   return EndSessionResponse.parse(await response.json());
 }
 
+/** The Learner has used all of today's translations. */
+export class TranslationLimitError extends Error {}
+
+/** The English Turn translation of a Partner Turn's text. */
+export async function translateTurn(sessionId: string, text: string): Promise<string> {
+  const token = await getIdToken();
+  if (!token) throw new Error("You've been signed out. Please sign in again.");
+  const response = await fetch("/api/translations", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ sessionId, text } satisfies TranslateRequest),
+  });
+  if (response.status === 429) throw new TranslationLimitError();
+  if (!response.ok) throw new Error(`Couldn't translate that (${response.status}). Please try again.`);
+  return TranslateResponse.parse(await response.json()).translation;
+}
+
 export async function startSession(
   choice: Omit<CreateSessionRequest, "sdpOffer">,
   events: SessionEvents,
 ): Promise<LiveSession> {
   let mic: MediaStream;
   try {
-    mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // The browser's own clean-up runs before turn detection sees the audio, so coughs, taps and
+    // the Partner's voice leaking from speakers are less likely to count as the Learner speaking.
+    mic = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
   } catch (err) {
     throw new MicrophoneBlockedError(err instanceof Error ? err.message : String(err));
   }
@@ -146,6 +169,9 @@ export async function startSession(
     if (response.status === 429) {
       const refusal = SessionRefusal.safeParse(await response.json().catch(() => undefined));
       throw new SessionRefusedError(refusal.success ? refusal.data.reason : "global-cap");
+    }
+    if (response.status === 403) {
+      throw new SessionStartError("Sessions aren't open to everyone yet. Ask the owner to give you access.");
     }
     if (response.status === 422) {
       throw new SessionStartError("That Topic can't be used. Please choose another Topic. Your other choices are kept.");

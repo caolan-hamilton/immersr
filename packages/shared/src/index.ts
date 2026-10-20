@@ -69,3 +69,14 @@ export const EndSessionResponse = z.object({
   immersionSeconds: z.number().int().nonnegative(),
 });
 export type EndSessionResponse = z.infer<typeof EndSessionResponse>;
+
+export const TRANSLATION_MAX_LENGTH = 500;
+
+export const TranslateRequest = z.object({
+  sessionId: z.string().min(1),
+  text: z.string().trim().min(1).max(TRANSLATION_MAX_LENGTH),
+});
+export type TranslateRequest = z.infer<typeof TranslateRequest>;
+
+export const TranslateResponse = z.object({ translation: z.string() });
+export type TranslateResponse = z.infer<typeof TranslateResponse>;

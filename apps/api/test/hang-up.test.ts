@@ -21,7 +21,7 @@ describe("scheduled hang-up", () => {
 
   async function start(sub: string, fake = fakeOutsideWorld()) {
     const deps = testDeps(table.tableName, fake);
-    const response = await createSession(deps)(httpEvent({ method: "POST", path: "/api/sessions", body: valid, sub }));
+    const response = await createSession(deps)(httpEvent({ method: "POST", path: "/api/sessions", body: valid, groups: ["admins"], sub }));
     expect(response.statusCode).toBe(201);
     const { sessionId } = parseBody(response);
     const end = (partnerSeconds: number) =>
@@ -60,7 +60,7 @@ describe("scheduled hang-up", () => {
     const deps = testDeps(table.tableName, fake);
 
     const response = await createSession(deps)(
-      httpEvent({ method: "POST", path: "/api/sessions", body: valid, sub: "unschedulable" }),
+      httpEvent({ method: "POST", path: "/api/sessions", body: valid, groups: ["admins"], sub: "unschedulable" }),
     );
 
     expect(response.statusCode).toBe(502);

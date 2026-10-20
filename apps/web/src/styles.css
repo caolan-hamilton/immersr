@@ -46,6 +46,15 @@ main {
   list-style: none;
   padding: 0;
 }
+.transcript .turn {
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.transcript .translation {
+  color: var(--muted);
+  font-style: italic;
+}
 .transcript li {
   margin: 8px 0;
 }

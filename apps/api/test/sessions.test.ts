@@ -17,9 +17,14 @@ describe("POST /api/sessions", () => {
   const item = async (PK: string, SK: string) =>
     (await testDb.send(new GetCommand({ TableName: table.tableName, Key: { PK, SK } }))).Item;
 
-  const post = (body: unknown, opts: { sub?: string; groups?: string[] } = { groups: ["admins"] }) => {
+  // `openToAll` simulates #12 (Sessions no longer admins-only), so ordinary Learner limits stay tested.
+  const post = (
+    body: unknown,
+    { openToAll = false, ...opts }: { sub?: string; groups?: string[]; openToAll?: boolean } = { groups: ["admins"] },
+  ) => {
     const fake = fakeOutsideWorld();
-    const result = createSession(testDeps(table.tableName, fake))(httpEvent({ method: "POST", path: "/api/sessions", body, ...opts }));
+    const deps = testDeps(table.tableName, fake, { sessionsAdminsOnly: !openToAll });
+    const result = createSession(deps)(httpEvent({ method: "POST", path: "/api/sessions", body, ...opts }));
     return result.then((response) => ({ response, fake }));
   };
   const valid = { sdpOffer: "v=0 offer", language: "pt-PT", level: "A2", topic: "my weekend" };
@@ -41,6 +46,7 @@ describe("POST /api/sessions", () => {
       audio: {
         input: {
           transcription: { model: "gpt-4o-mini-transcribe" },
+          noise_reduction: { type: "far_field" },
           turn_detection: { type: "semantic_vad", eagerness: "low", interrupt_response: true },
         },
         output: { voice: "cedar", speed: 0.9 },
@@ -60,14 +66,26 @@ describe("POST /api/sessions", () => {
     });
   });
 
-  it("starts a Session for a Learner who is not an admin", async () => {
-    const { response } = await post(valid, { sub: "plain-learner", groups: [] });
+  it("refuses a Learner who is not an admin with 403 while Sessions are admins-only: no moderation, Reservation or OpenAI call", async () => {
+    const { response, fake } = await post(valid, { sub: "plain-learner", groups: [] });
+
+    expect(response.statusCode).toBe(403);
+    expect(fake.recorded.moderated).toHaveLength(0);
+    expect(fake.recorded.createCalls).toHaveLength(0);
+    const usage = await testDb.send(
+      new GetCommand({ TableName: table.tableName, Key: { PK: "LEARNER#plain-learner", SK: `USAGE#2026-10-19` } }),
+    );
+    expect(usage.Item).toBeUndefined();
+  });
+
+  it("starts a Session for a Learner who is not an admin once Sessions are open to all (#12)", async () => {
+    const { response } = await post(valid, { sub: "plain-learner-later", groups: [], openToAll: true });
 
     expect(response.statusCode).toBe(201);
   });
 
   it("reserves the maximum Session length on the Learner's and the global usage, with a 7 day TTL", async () => {
-    const { response } = await post(valid, { sub: "reserver", groups: [] });
+    const { response } = await post(valid, { sub: "reserver", groups: [], openToAll: true });
     const { sessionId } = parseBody(response);
 
     const learnerUsage = await item("LEARNER#reserver", "USAGE#2026-10-19");
@@ -84,8 +102,8 @@ describe("POST /api/sessions", () => {
   });
 
   it("refuses a second Session over the Daily allowance with 429 daily-allowance and never calls OpenAI", async () => {
-    await post(valid, { sub: "greedy", groups: [] });
-    const { response, fake } = await post(valid, { sub: "greedy", groups: [] });
+    await post(valid, { sub: "greedy", groups: [], openToAll: true });
+    const { response, fake } = await post(valid, { sub: "greedy", groups: [], openToAll: true });
 
     expect(response.statusCode).toBe(429);
     expect(parseBody(response)).toEqual({ reason: "daily-allowance" });
@@ -97,7 +115,7 @@ describe("POST /api/sessions", () => {
     await testDb.send(
       new PutCommand({ TableName: table.tableName, Item: { PK: "GLOBAL", SK: "USAGE#2026-10-19", reservedSeconds: 2700 } }),
     );
-    const { response, fake } = await post(valid, { sub: "capped", groups: [] });
+    const { response, fake } = await post(valid, { sub: "capped", groups: [], openToAll: true });
 
     expect(response.statusCode).toBe(429);
     expect(parseBody(response)).toEqual({ reason: "global-cap" });
@@ -168,7 +186,7 @@ describe("POST /api/sessions", () => {
   it("returns 502 and releases the Reservation when OpenAI fails", async () => {
     const fake = fakeOutsideWorld();
     fake.steer.failCreateCall = true;
-    const response = await createSession(testDeps(table.tableName, fake))(
+    const response = await createSession(testDeps(table.tableName, fake, { sessionsAdminsOnly: false }))(
       httpEvent({ method: "POST", path: "/api/sessions", body: valid, sub: "unlucky" }),
     );
 
@@ -210,6 +228,13 @@ describe("buildInstructions", () => {
     expect(instructions).toContain(EXAMPLE_TURNS[language][level]);
     expect(instructions).toContain(LEVEL_SPECS[level].spec);
     expect(instructions).toContain("«cooking»");
+  });
+
+  it.each(LANGUAGES)("tells the %s Partner to resume, not change topic, after a noise interrupts it", (language) => {
+    const instructions = buildInstructions({ language, level: "A1", topic: "cooking" });
+
+    expect(instructions).toContain("# When you are cut off by a noise");
+    expect(instructions).toContain(`continue in ${LANGUAGE_SPECS[language].name} exactly where you stopped`);
   });
 
   it("has the speed from the Level", () => {

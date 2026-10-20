@@ -22,6 +22,16 @@ describe("Auth (Google only)", () => {
     expect(flows.filter((f) => f !== "ALLOW_REFRESH_TOKEN_AUTH")).toEqual([]);
   });
 
+  // ADR 0007: erasing a Learner can't revoke their tokens, so they must expire fast.
+  it("keeps access and ID tokens to 15 minutes and refresh tokens to 30 days", () => {
+    template.hasResourceProperties("AWS::Cognito::UserPoolClient", {
+      AccessTokenValidity: 15,
+      IdTokenValidity: 15,
+      RefreshTokenValidity: 43200,
+      TokenValidityUnits: { AccessToken: "minutes", IdToken: "minutes", RefreshToken: "minutes" },
+    });
+  });
+
   it("offers Google as the only identity provider", () => {
     template.hasResourceProperties("AWS::Cognito::UserPoolClient", {
       SupportedIdentityProviders: ["Google"],
