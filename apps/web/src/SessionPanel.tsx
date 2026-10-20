@@ -4,6 +4,7 @@ import { formatTimeOfDay } from "./format.ts";
 import { useLevel } from "./level.ts";
 import { readListeningMode, saveListeningMode } from "./listening-mode.ts";
 import { LiveSession } from "./LiveSession.tsx";
+import type { NavScreen } from "./Nav.tsx";
 import { initialSessionState, needsTranslation, sessionReducer } from "./session-state.ts";
 import { Setup } from "./Setup.tsx";
 import { Summary } from "./Summary.tsx";
@@ -38,11 +39,13 @@ interface SessionPanelProps {
   immersion: MeResponse["immersion"];
   language: Language;
   onLanguageChange(language: Language): void;
+  streak: number;
+  onNavigate(screen: NavScreen): void;
   onSettled(): void;
   onBack(): void;
 }
 
-export function SessionPanel({ allowance, immersion, language, onLanguageChange, onSettled, onBack }: SessionPanelProps) {
+export function SessionPanel({ allowance, immersion, language, onLanguageChange, streak, onNavigate, onSettled, onBack }: SessionPanelProps) {
   const remaining = Math.max(0, allowance.limitSeconds - allowance.usedSeconds);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [summary, setSummary] = useState<SettledSession>();
@@ -226,7 +229,8 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
 
   if (phase === "live") {
     return (
-      <div className="flex grow flex-col">
+      // On a wide window the Session fills the window exactly: the Transcript scrolls inside it, not the page.
+      <div className="flex grow flex-col desk:h-dvh">
         <LiveSession
           language={language}
           level={level}
@@ -283,6 +287,8 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
           topic={topic}
           onTopicChange={setTopic}
           remainingSeconds={remaining}
+          streak={streak}
+          onNavigate={onNavigate}
           error={error}
           micBlocked={micBlocked}
           onBack={onBack}

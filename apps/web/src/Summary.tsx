@@ -20,15 +20,17 @@ export function Summary({ language, result, beforeSeconds, onBackToHome }: Summa
   const { next, fraction } = nextMilestone(totalSeconds);
 
   return (
-    <div className="flex grow flex-col">
-      <div className="relative border-b-[3px] border-line">
-        <Scene language={language} height={260} />
-        <div className="absolute inset-x-0 bottom-5 flex justify-center">
-          <Blob color={theme.body} mood="happy" size={140} label="Blob celebrating" />
+    <div className="flex grow flex-col desk:grid desk:grid-cols-2">
+      <div className="relative border-b-[3px] border-line desk:min-h-[560px] desk:border-b-0 desk:border-r-[3px]">
+        <div className="desk:absolute desk:inset-0">
+          <Scene language={language} className="h-[260px] desk:h-full" />
+        </div>
+        <div className="absolute inset-x-0 bottom-5 flex justify-center desk:bottom-[50px]">
+          <Blob color={theme.body} mood="happy" size={140} label="Blob celebrating" className="desk:h-auto desk:w-[240px]" />
         </div>
       </div>
-      <div className="flex grow flex-col gap-3 p-5">
-        <h1 className="font-display text-[30px] font-black">{theme.wellDone}</h1>
+      <div className="flex grow flex-col gap-3 p-5 desk:max-w-[560px] desk:grow-0 desk:justify-center desk:gap-4 desk:self-center desk:px-14 desk:py-12">
+        <h1 className="font-display text-[30px] font-black desk:text-[56px]">{theme.wellDone}</h1>
         {crossed && (
           <div role="status" className="chunk bg-body px-4 py-3 text-on-body">
             <div className="font-display text-[22px] font-black">
@@ -40,7 +42,7 @@ export function Summary({ language, result, beforeSeconds, onBackToHome }: Summa
           </div>
         )}
         <div className="chunk bg-you px-4 py-3.5 text-[#141414]">
-          <div className="font-display text-[30px] font-black">+{formatDuration(result.immersionSeconds)}</div>
+          <div className="font-display text-[30px] font-black desk:text-[40px]">+{formatDuration(result.immersionSeconds)}</div>
           <div className="font-medium">Immersion time added</div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -72,8 +74,8 @@ export function Summary({ language, result, beforeSeconds, onBackToHome }: Summa
             <div className="text-sm font-bold">You've passed every Milestone in {theme.short}. Wonderful!</div>
           )}
         </div>
-        <div className="grow" />
-        <button type="button" className="chunk-btn bg-accent text-white" onClick={onBackToHome}>
+        <div className="grow desk:hidden" />
+        <button type="button" className="chunk-btn bg-accent text-white desk:mt-1 desk:self-start desk:px-9" onClick={onBackToHome}>
           Back to Home
         </button>
       </div>

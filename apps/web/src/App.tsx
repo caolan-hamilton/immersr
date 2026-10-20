@@ -3,6 +3,7 @@ import { MeResponse } from "@immersr/shared";
 import { Account } from "./Account.tsx";
 import { Home } from "./Home.tsx";
 import { Landing } from "./Landing.tsx";
+import { BottomNav, TopBar } from "./Nav.tsx";
 import { SessionPanel } from "./SessionPanel.tsx";
 import { THEMES, themeVars, useCurrentLanguage } from "./themes.ts";
 import { completeSignInIfRedirected, getIdToken, isSignedIn } from "./auth.ts";
@@ -42,7 +43,8 @@ export function App() {
 
   return (
     <div style={themeVars(theme)} className="min-h-dvh bg-bg font-sans text-ink">
-      <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-bg sm:border-x-[3px] sm:border-line">
+      <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-bg sm:border-x-[3px] sm:border-line desk:max-w-none desk:border-x-0">
+        {state.kind === "home" && screen !== "session" && <TopBar current={screen} go={setScreen} streak={state.me.streak} />}
         <div aria-live="polite" className="flex grow flex-col">
           {state.kind === "loading" && <p className="p-5">Loading…</p>}
           {state.kind === "signed-out" && <Landing language={language} />}
@@ -68,13 +70,15 @@ export function App() {
                 immersion={state.me.immersion}
                 language={language}
                 onLanguageChange={setLanguage}
+                streak={state.me.streak}
+                onNavigate={setScreen}
                 onSettled={refreshMe}
               />
             </SessionScreen>
           )}
           {state.kind === "home" && screen === "account" && <Account />}
         </div>
-        {state.kind === "home" && screen !== "session" && <Nav current={screen} go={setScreen} />}
+        {state.kind === "home" && screen !== "session" && <BottomNav current={screen} go={setScreen} />}
       </main>
     </div>
   );
@@ -83,35 +87,4 @@ export function App() {
 // Hosts Setup and the Session flow. Hidden, not unmounted, off its screen.
 function SessionScreen({ visible, children }: { visible: boolean; children: ReactNode }) {
   return <div className={visible ? "flex grow flex-col" : "hidden"}>{children}</div>;
-}
-
-function Nav({ current, go }: { current: "home" | "account"; go(screen: "home" | "account"): void }) {
-  const item = "nav-item flex min-h-11 flex-col items-center justify-center gap-1 px-6 text-[13px] font-bold";
-  return (
-    <nav className="flex justify-around border-t-[3px] border-line bg-card pb-5 pt-2.5">
-      <button
-        type="button"
-        className={`${item} ${current === "home" ? "text-ink" : "text-muted"}`}
-        aria-current={current === "home" ? "page" : undefined}
-        onClick={() => go("home")}
-      >
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-          <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-        </svg>
-        Home
-      </button>
-      <button
-        type="button"
-        className={`${item} ${current === "account" ? "text-ink" : "text-muted"}`}
-        aria-current={current === "account" ? "page" : undefined}
-        onClick={() => go("account")}
-      >
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-          <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" strokeWidth="2" />
-          <path d="M4 21c1-4 4-6 8-6s7 2 8 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-        Account
-      </button>
-    </nav>
-  );
 }
