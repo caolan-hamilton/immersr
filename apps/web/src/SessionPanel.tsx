@@ -65,9 +65,13 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
     const asking = needsTranslation(session, index);
     dispatch({ kind: "toggle-translation", index });
     if (!asking) return;
+    // A late answer from an earlier Session must not land on a Turn of the current one.
+    const stillThisSession = () => transcriptSession.current === sessionId;
     try {
-      dispatch({ kind: "translation-arrived", index, text: await translateTurn(sessionId, text) });
+      const translated = await translateTurn(sessionId, text);
+      if (stillThisSession()) dispatch({ kind: "translation-arrived", index, text: translated });
     } catch (err) {
+      if (!stillThisSession()) return;
       const message = err instanceof TranslationLimitError ? TRANSLATION_LIMIT_MESSAGE : err instanceof Error ? err.message : String(err);
       dispatch({ kind: "translation-failed", index, message });
     }
