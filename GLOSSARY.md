@@ -56,6 +56,38 @@ _Avoid_: Fallback, translation, hint
 The live written record of a Session's Turns, shown to the Learner as the conversation happens.
 _Avoid_: Log, captions, history
 
+**Partner state**:
+What the Partner is doing at a moment in a Session: Speaking, Listening (it is the Learner's turn), or Thinking (the Learner has finished and a reply is coming).
+_Avoid_: Status, mode, activity
+
+**Mascot**:
+The single character that gives the Partner a face, the same in every Target language but themed with that language's colours and a cultural detail; it acts out the Partner state.
+_Avoid_: Avatar, character, persona
+
+**Milestone**:
+An amount of Immersion time in one Target language (50, 150, 300, 600, 1,000 or 1,500 hours) that marks a known stage of acquisition.
+_Avoid_: Level, badge, achievement
+
+**Streak**:
+The number of consecutive days on which the Learner has had at least one Session.
+_Avoid_: Daily goal, chain
+
+**Topic suggestion**:
+A ready-made Topic the Learner can pick instead of typing their own.
+_Avoid_: Chip, preset, scenario
+
+**Pause**:
+A break the Learner takes inside a Session: the Partner stops speaking and the Learner's microphone goes quiet, while the Session's time keeps running.
+_Avoid_: Hold, freeze, suspend
+
+**Mute**:
+Stopping the Learner's microphone during a Session while the Partner carries on speaking.
+_Avoid_: Silence, pause
+
+**Listening mode**:
+A way of taking part in a Session with the Transcript hidden, so the Learner acquires through listening alone.
+_Avoid_: Audio-only, hide transcript, focus mode
+
 **Turn translation**:
 The English rendering of a single Partner Turn, shown when the Learner taps it in the Transcript.
 _Avoid_: Tap-to-translate, gloss
