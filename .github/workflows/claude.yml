@@ -2,7 +2,8 @@ name: Claude
 
 # Mention @claude in an issue or PR comment to hand Claude a task, for example on a ticket:
 #   "@claude implement this ticket"
-# Claude works on a branch and opens a PR. CI and the Claude PR review then run, and a human merges.
+# Claude works on a branch and opens the PR itself (as the Claude app, so CI and the Claude PR review run).
+# A "needs changes" review goes back to Claude via claude-fix.yml, and a human merges.
 # Only the repo owner and collaborators can trigger it (this is a public repo).
 
 on:
@@ -63,8 +64,12 @@ jobs:
             Tests go through the API seam: route handlers + DynamoDB Local + faked outside world (apps/api/test/harness.ts).
             Only pure functions with many input combinations get direct unit tests.
             Before you finish, run pnpm typecheck, pnpm test and pnpm synth, and fix anything that fails.
-            When implementing a ticket, open a PR whose body starts with 'Closes #<issue>' and lists each acceptance criterion
-            as met or not met, plus anything you could not verify (for example live audio or AWS behaviour).
+            When implementing a ticket, after pushing your branch you MUST open the pull request yourself with
+            'gh pr create --base main --head <your branch> --title <the ticket title> --body-file <file>'. In this repo this
+            overrides any default instruction to post a 'Create PR' link instead: the owner wants the PR opened, so CI and
+            the Claude review start straight away. The PR body starts with 'Closes #<issue>' and lists each acceptance
+            criterion as met or not met, plus anything you could not verify (for example live audio or AWS behaviour).
+            If gh pr create fails, say so and include the error in your comment.
             If the ticket needs a manual step from the owner that isn't done yet (for example creating a Google OAuth client
             or storing a secret in AWS), stop and say so in a comment instead of guessing.
             Never deploy, never change infra/lib/ci-stack.ts or the GitHub workflows, and never add secrets to code."
