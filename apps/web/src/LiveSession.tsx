@@ -1,4 +1,5 @@
 import type { Language, Level } from "@immersr/shared";
+import { useEffect, useRef } from "react";
 import { Blob } from "./Blob.tsx";
 import { formatCountdown } from "./format.ts";
 import { Scene } from "./Scenes.tsx";
@@ -30,6 +31,13 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
   const theme = THEMES[language];
   const { partner, turns, draft, translations, muted, paused, listeningMode } = state;
   const partnerLabel = paused ? "Paused" : PARTNER_LABEL[partner];
+  // The Transcript follows the newest line, unless the Learner has scrolled up to reread something.
+  const transcript = useRef<HTMLUListElement>(null);
+  const following = useRef(true);
+  useEffect(() => {
+    const list = transcript.current;
+    if (list && following.current) list.scrollTop = list.scrollHeight;
+  }, [turns.length, draft, listeningMode]);
   return (
     <div className="flex grow flex-col">
       <div className="relative border-b-[3px] border-line">
@@ -66,7 +74,15 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
       {listeningMode ? (
         <p className="m-auto px-4 py-6 text-center text-[15px] text-muted">Listening mode: no Transcript, just listen.</p>
       ) : (
-      <ul className="m-0 flex max-h-[330px] grow list-none flex-col gap-2.5 overflow-y-auto p-0 px-4 py-3.5" aria-label="Transcript">
+      <ul
+        ref={transcript}
+        onScroll={(e) => {
+          const list = e.currentTarget;
+          following.current = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
+        }}
+        className="m-0 flex max-h-[330px] grow list-none flex-col gap-2.5 overflow-y-auto p-0 px-4 py-3.5"
+        aria-label="Transcript"
+      >
         {turns.map((turn, i) => {
           if (turn.speaker === "Learner") {
             return (

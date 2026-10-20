@@ -10,6 +10,7 @@ import {
   type TranslateRequest,
 } from "@immersr/shared";
 import { getIdToken } from "./auth.ts";
+import { isHarmlessRealtimeError } from "./realtime-errors.ts";
 
 export type TurnSpeaker = "Partner" | "Learner";
 
@@ -143,7 +144,7 @@ export async function startSession(
         type: string;
         delta?: string;
         transcript?: string;
-        error?: { message?: string };
+        error?: { code?: string; message?: string };
         response?: { usage?: { output_token_details?: { audio_tokens?: number } } };
       };
       events.onRealtimeEvent(event.type);
@@ -164,6 +165,10 @@ export async function startSession(
           if (event.transcript?.trim()) events.onTurn("Learner", event.transcript.trim());
           break;
         case "error":
+          if (isHarmlessRealtimeError(event.error)) {
+            console.warn("Ignored a harmless Realtime error:", event.error);
+            break;
+          }
           events.onError(event.error?.message ?? "The Partner hit an error.");
           break;
       }
