@@ -91,7 +91,11 @@ export async function startSession(
 ): Promise<LiveSession> {
   let mic: MediaStream;
   try {
-    mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // The browser's own clean-up runs before turn detection sees the audio, so coughs, taps and
+    // the Partner's voice leaking from speakers are less likely to count as the Learner speaking.
+    mic = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
   } catch (err) {
     throw new MicrophoneBlockedError(err instanceof Error ? err.message : String(err));
   }
@@ -165,6 +169,9 @@ export async function startSession(
     if (response.status === 429) {
       const refusal = SessionRefusal.safeParse(await response.json().catch(() => undefined));
       throw new SessionRefusedError(refusal.success ? refusal.data.reason : "global-cap");
+    }
+    if (response.status === 403) {
+      throw new SessionStartError("Sessions aren't open to everyone yet. Ask the owner to give you access.");
     }
     if (response.status === 422) {
       throw new SessionStartError("That Topic can't be used. Please choose another Topic. Your other choices are kept.");

@@ -7,6 +7,8 @@ export interface Deps {
   tableName: string;
   stage: string;
   world: OutsideWorld;
+  /** Sessions are admins-only until #12 opens Immersr to all Learners by setting SESSIONS_OPEN_TO_ALL=true. */
+  sessionsAdminsOnly: boolean;
 }
 
 const requireEnv = (name: string): string => {
@@ -21,5 +23,6 @@ export function productionDeps(): Deps {
     tableName: requireEnv("TABLE_NAME"),
     stage: requireEnv("STAGE"),
     world: productionOutsideWorld(),
+    sessionsAdminsOnly: process.env.SESSIONS_OPEN_TO_ALL !== "true",
   };
 }
