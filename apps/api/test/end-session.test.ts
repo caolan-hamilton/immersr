@@ -50,7 +50,11 @@ describe("POST /api/sessions/{id}/end", () => {
     const response = await end(200);
 
     expect(response.statusCode).toBe(200);
-    expect(EndSessionResponse.parse(parseBody(response))).toEqual({ chargedSeconds: 300, immersionSeconds: 200 });
+    expect(EndSessionResponse.parse(parseBody(response))).toEqual({
+      chargedSeconds: 300,
+      immersionSeconds: 200,
+      returnedSeconds: 600,
+    });
     expect(fake.recorded.hangups).toEqual(["rtc_fake_1"]);
     expect((await item("LEARNER#ender", "USAGE#2026-10-19"))?.reservedSeconds).toBe(300);
     expect((await item("LEARNER#ender", "IMMERSION#pt-PT"))?.partnerSeconds).toBe(200);
@@ -79,7 +83,7 @@ describe("POST /api/sessions/{id}/end", () => {
     const retried = await end(90);
 
     expect(retried.statusCode).toBe(200);
-    expect(parseBody(retried)).toEqual({ chargedSeconds: 180, immersionSeconds: 90 });
+    expect(parseBody(retried)).toEqual({ chargedSeconds: 180, immersionSeconds: 90, returnedSeconds: 720 });
     expect(fake.recorded.hangups).toEqual(["rtc_fake_1"]);
     expect((await item("LEARNER#unhung", "USAGE#2026-10-19"))?.reservedSeconds).toBe(180);
   });
@@ -95,7 +99,7 @@ describe("POST /api/sessions/{id}/end", () => {
     const { fake, end } = await start("fibber");
     fake.clock.advance(60 * 1000);
 
-    expect(parseBody(await end(5000))).toEqual({ chargedSeconds: 60, immersionSeconds: 60 });
+    expect(parseBody(await end(5000))).toEqual({ chargedSeconds: 60, immersionSeconds: 60, returnedSeconds: 840 });
     expect((await item("LEARNER#fibber", "IMMERSION#pt-PT"))?.partnerSeconds).toBe(60);
   });
 
@@ -108,6 +112,7 @@ describe("POST /api/sessions/{id}/end", () => {
     const second = await end(100);
 
     expect(parseBody(second)).toEqual(parseBody(first));
+    expect(parseBody(second).returnedSeconds).toBe(780);
     expect((await item("LEARNER#repeater", "USAGE#2026-10-19"))?.reservedSeconds).toBe(120);
     expect((await item("LEARNER#repeater", "IMMERSION#pt-PT"))?.partnerSeconds).toBe(100);
   });
@@ -122,7 +127,11 @@ describe("POST /api/sessions/{id}/end", () => {
     const response = await end(600);
 
     expect(response.statusCode).toBe(200);
-    expect(EndSessionResponse.parse(parseBody(response))).toEqual({ chargedSeconds: 900, immersionSeconds: 0 });
+    expect(EndSessionResponse.parse(parseBody(response))).toEqual({
+      chargedSeconds: 900,
+      immersionSeconds: 0,
+      returnedSeconds: 0,
+    });
     expect((await item("LEARNER#latecomer", "USAGE#2026-10-19"))?.reservedSeconds).toBe(900);
     expect(await item("LEARNER#latecomer", "IMMERSION#pt-PT")).toBeUndefined();
   });

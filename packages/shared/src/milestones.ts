@@ -31,3 +31,8 @@ export function nextMilestone(immersionSeconds: number): MilestoneProgress {
   const targetSeconds = next.hours * 3600;
   return { next, remainingSeconds: targetSeconds - seconds, fraction: seconds / targetSeconds };
 }
+
+/** The highest Milestone that going from `beforeSeconds` to `afterSeconds` of Immersion time reached, if any. */
+export function crossedMilestone(beforeSeconds: number, afterSeconds: number): Milestone | undefined {
+  return MILESTONES.filter((m) => beforeSeconds < m.hours * 3600 && afterSeconds >= m.hours * 3600).at(-1);
+}

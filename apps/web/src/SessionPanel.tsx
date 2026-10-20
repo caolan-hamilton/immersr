@@ -1,11 +1,12 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { type EndSessionResponse, type Language, type MeResponse } from "@immersr/shared";
-import { formatDuration, formatTimeOfDay } from "./format.ts";
+import { formatTimeOfDay } from "./format.ts";
 import { useLevel } from "./level.ts";
 import { readListeningMode, saveListeningMode } from "./listening-mode.ts";
 import { LiveSession } from "./LiveSession.tsx";
 import { initialSessionState, needsTranslation, sessionReducer } from "./session-state.ts";
 import { Setup } from "./Setup.tsx";
+import { Summary } from "./Summary.tsx";
 import { clearPendingEnd, deliverPendingEnd, loadPendingEnd, savePendingEnd, type PendingEnd } from "./pending-end.ts";
 import {
   MicrophoneBlockedError,
@@ -18,7 +19,14 @@ import {
 
 const TRANSLATION_LIMIT_MESSAGE = "You've reached today's translation limit. It resets at midnight UTC.";
 
-type Phase = "setup" | "connecting" | "live" | "ending" | "end-failed";
+type Phase = "setup" | "connecting" | "live" | "ending" | "end-failed" | "summary";
+
+/** A settled Session, with the Target language and Immersion time it started from. */
+interface SettledSession {
+  result: EndSessionResponse;
+  language: Language;
+  beforeSeconds: number;
+}
 
 const refusalMessage = (reason: SessionRefusedError["reason"], resetsAt: string) =>
   reason === "daily-allowance"
@@ -27,16 +35,19 @@ const refusalMessage = (reason: SessionRefusedError["reason"], resetsAt: string)
 
 interface SessionPanelProps {
   allowance: MeResponse["allowance"];
+  immersion: MeResponse["immersion"];
   language: Language;
   onLanguageChange(language: Language): void;
   onSettled(): void;
   onBack(): void;
 }
 
-export function SessionPanel({ allowance, language, onLanguageChange, onSettled, onBack }: SessionPanelProps) {
+export function SessionPanel({ allowance, immersion, language, onLanguageChange, onSettled, onBack }: SessionPanelProps) {
   const remaining = Math.max(0, allowance.limitSeconds - allowance.usedSeconds);
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [summary, setSummary] = useState<EndSessionResponse>();
+  const [summary, setSummary] = useState<SettledSession>();
+  // The Target language and Immersion time the running Session started from, for the Summary.
+  const startedFrom = useRef<{ language: Language; beforeSeconds: number } | undefined>(undefined);
   const finishing = useRef(false);
   // The Session the server hasn't settled yet, kept so a failed End can be retried.
   // Also saved on the device, so it survives a closed tab or a reload.
@@ -118,10 +129,14 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
     setPhase("ending");
     setError(undefined);
     try {
-      setSummary(await deliverPendingEnd(pending));
+      const result = await deliverPendingEnd(pending);
       unsettled.current = undefined;
       finishing.current = false;
-      setPhase("setup");
+      // Without a start in this page load there is nothing to compare against, so no Summary.
+      if (result && startedFrom.current) {
+        setSummary({ result, ...startedFrom.current });
+        setPhase("summary");
+      } else setPhase("setup");
       onSettled();
     } catch (err) {
       finishing.current = false;
@@ -142,9 +157,8 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
       if (!pending || live.current || finishing.current || retrying.current) return;
       retrying.current = true;
       try {
-        const result = await deliverPendingEnd(pending);
+        await deliverPendingEnd(pending);
         unsettled.current = undefined;
-        if (result) setSummary(result);
         setError(undefined);
         setPhase("setup");
         onSettledRef.current();
@@ -181,6 +195,7 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
     }
     setPhase("connecting");
     setSummary(undefined);
+    startedFrom.current = { language, beforeSeconds: immersion[language] ?? 0 };
     setError(undefined);
     setMicBlocked(false);
     dispatch({ kind: "reset" });
@@ -243,16 +258,23 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
     );
   }
 
+  if (phase === "summary" && summary) {
+    return (
+      <Summary
+        language={summary.language}
+        result={summary.result}
+        beforeSeconds={summary.beforeSeconds}
+        onBackToHome={() => {
+          setPhase("setup");
+          onBack();
+        }}
+      />
+    );
+  }
+
   if (phase === "setup") {
     return (
       <div className="flex grow flex-col">
-        {summary && (
-          <p role="status" className="session-panel m-5 mb-0">
-            Session over. <b>{formatDuration(summary.immersionSeconds)}</b> added to your Immersion time (
-            {summary.immersionSeconds}s of the Partner speaking, {formatDuration(summary.chargedSeconds)} of your
-            allowance used).
-          </p>
-        )}
         <Setup
           language={language}
           onLanguageChange={onLanguageChange}

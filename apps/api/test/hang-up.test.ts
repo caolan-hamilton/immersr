@@ -97,7 +97,7 @@ describe("scheduled hang-up", () => {
     const response = await end(500);
 
     expect(response.statusCode).toBe(200);
-    expect(parseBody(response)).toEqual({ chargedSeconds: 900, immersionSeconds: 0 });
+    expect(parseBody(response)).toEqual({ chargedSeconds: 900, immersionSeconds: 0, returnedSeconds: 0 });
     expect(await item("LEARNER#late-ender", "IMMERSION#pt-PT")).toBeUndefined();
     expect((await item("LEARNER#late-ender", "USAGE#2026-10-19"))?.reservedSeconds).toBe(900);
   });
@@ -109,7 +109,7 @@ describe("scheduled hang-up", () => {
 
     await fire();
 
-    expect(parseBody(ended)).toEqual({ chargedSeconds: 120, immersionSeconds: 60 });
+    expect(parseBody(ended)).toEqual({ chargedSeconds: 120, immersionSeconds: 60, returnedSeconds: 780 });
     expect(fake.recorded.hangups).toEqual(["rtc_fake_1"]);
     expect(await item("LEARNER#early-ender", `SESSION#${sessionId}`)).toMatchObject({
       status: "ended",

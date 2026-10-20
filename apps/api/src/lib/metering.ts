@@ -128,7 +128,16 @@ export type Outcome = "ended" | "timed-out" | "released";
 export interface Settlement {
   chargedSeconds: number;
   immersionSeconds: number;
+  /** The Reservation minus what was charged: what went back to today's Daily allowance. */
+  returnedSeconds: number;
 }
+
+/** The result of an already-settled Session, as stored on it. */
+export const storedSettlement = (session: SessionItem): Settlement => ({
+  chargedSeconds: session.chargedSeconds ?? 0,
+  immersionSeconds: session.immersionSeconds ?? 0,
+  returnedSeconds: session.reservedSeconds - (session.chargedSeconds ?? 0),
+});
 
 /**
  * Settles an `active` Session once: charges `min(now - startedAt, reserved)` (nothing when released), refunds
@@ -194,12 +203,12 @@ export async function settle(
         ],
       }),
     );
-    return { chargedSeconds, immersionSeconds };
+    return { chargedSeconds, immersionSeconds, returnedSeconds: refund };
   } catch (err) {
     if (err instanceof TransactionCanceledException) {
       const stored = await getSession(deps, sub, session.sessionId);
       if (stored && stored.status !== "active") {
-        return { chargedSeconds: stored.chargedSeconds ?? 0, immersionSeconds: stored.immersionSeconds ?? 0 };
+        return storedSettlement(stored);
       }
       if (stored && attempt < 3) continue;
     }

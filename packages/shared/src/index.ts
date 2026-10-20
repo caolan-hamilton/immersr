@@ -73,6 +73,8 @@ export type EndSessionRequest = z.infer<typeof EndSessionRequest>;
 export const EndSessionResponse = z.object({
   chargedSeconds: z.number().int().nonnegative(),
   immersionSeconds: z.number().int().nonnegative(),
+  /** The Reservation minus what was charged: the time handed back to today's Daily allowance. */
+  returnedSeconds: z.number().int().nonnegative(),
 });
 export type EndSessionResponse = z.infer<typeof EndSessionResponse>;
 
