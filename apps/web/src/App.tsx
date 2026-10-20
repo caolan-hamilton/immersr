@@ -43,7 +43,7 @@ export function App() {
 
   return (
     <div style={themeVars(theme)} className="min-h-dvh bg-bg font-sans text-ink">
-      <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-bg sm:border-x-[3px] sm:border-line desk:max-w-none desk:border-x-0">
+      <main className="flex min-h-dvh w-full flex-col bg-bg">
         {state.kind === "home" && screen !== "session" && <TopBar current={screen} go={setScreen} streak={state.me.streak} />}
         <div aria-live="polite" className="flex grow flex-col">
           {state.kind === "loading" && <p className="p-5">Loading…</p>}
