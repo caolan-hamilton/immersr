@@ -118,19 +118,16 @@ function SessionScreen({
 }) {
   return (
     <div className={visible ? "flex grow flex-col" : "hidden"}>
-      <header className="flex items-center justify-between border-b-[3px] border-line bg-body px-5 py-3 text-on-body">
-        <span className="font-display text-[26px] font-black">Immersr</span>
-        <button
-          type="button"
-          className="pick bg-card"
-          style={{ color: "var(--ink)" }}
-          disabled={busy}
-          onClick={onBack}
-        >
-          Back to Home
-        </button>
-      </header>
-      <div className="p-5">{children}</div>
+      {/* While a Session is connecting, live or ending, the screen is the Session's own. */}
+      {!busy && (
+        <header className="flex items-center justify-between border-b-[3px] border-line bg-body px-5 py-3 text-on-body">
+          <span className="font-display text-[26px] font-black">Immersr</span>
+          <button type="button" className="pick bg-card" style={{ color: "var(--ink)" }} onClick={onBack}>
+            Back to Home
+          </button>
+        </header>
+      )}
+      {children}
     </div>
   );
 }

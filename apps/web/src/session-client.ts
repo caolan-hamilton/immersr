@@ -18,6 +18,8 @@ export interface SessionEvents {
   onPartnerDraft(text: string): void;
   onTurn(speaker: TurnSpeaker, text: string): void;
   onError(message: string): void;
+  /** Every realtime event's type, passed on as it arrives, for the Session screen's state. */
+  onRealtimeEvent(type: string): void;
   /** The connection failed or closed without the Learner pressing End. */
   onDisconnected(): void;
 }
@@ -133,6 +135,7 @@ export async function startSession(
         error?: { message?: string };
         response?: { usage?: { output_token_details?: { audio_tokens?: number } } };
       };
+      events.onRealtimeEvent(event.type);
       switch (event.type) {
         case "response.done":
           outputAudioTokens += event.response?.usage?.output_token_details?.audio_tokens ?? 0;
