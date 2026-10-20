@@ -4,7 +4,7 @@ import { ConditionalCheckFailedException, TransactionCanceledException } from "@
 import type { SessionRefusal } from "@immersr/shared";
 import type { Deps } from "./deps.ts";
 import { DAILY_TRANSLATION_LIMIT, GLOBAL_DAILY_CAP_SECONDS, MAX_SESSION_SECONDS, USAGE_TTL_SECONDS } from "./limits.ts";
-import { usageDay } from "./learner.ts";
+import { previousDay, usageDay } from "./learner.ts";
 import { TABLE } from "./table.ts";
 
 const { partitionKey: PK, sortKey: SK, ttlAttribute: TTL } = TABLE;
@@ -21,6 +21,8 @@ export interface SessionItem {
   level: string;
   topic: string;
   usageDay: string;
+  /** The Learner's calendar day when the Session started, in their time zone (for the Streak). */
+  localDay: string;
   startedAt: string;
   endsAt: string;
   reservedSeconds: number;
@@ -95,6 +97,32 @@ export async function reserve(
   }
 }
 
+export const STREAK_SORT_KEY = "STREAK";
+
+/**
+ * The write that records a Session on the Learner's Streak, or nothing when it changes nothing: the same local
+ * day again, or a released Session. The condition guards against two Sessions settling at once.
+ */
+function streakUpdate(deps: Deps, sub: string, session: SessionItem, outcome: Outcome, stored: Record<string, unknown> | undefined) {
+  // Nothing to record for a released Session, a Session from before `localDay` existed, the same local day
+  // again, or an earlier local day than the stored one (the Learner travelled west, or Sessions settled out of order).
+  if (outcome === "released" || !session.localDay) return [];
+  if (typeof stored?.lastDay === "string" && session.localDay <= stored.lastDay) return [];
+  const continues = stored?.lastDay === previousDay(session.localDay);
+  const count = continues ? Number(stored?.count ?? 0) + 1 : 1;
+  return [
+    {
+      Put: {
+        TableName: deps.tableName,
+        Item: { [PK]: learnerKey(sub), [SK]: STREAK_SORT_KEY, count, lastDay: session.localDay },
+        ...(stored
+          ? { ConditionExpression: "lastDay = :seen", ExpressionAttributeValues: { ":seen": stored.lastDay } }
+          : { ConditionExpression: "attribute_not_exists(#pk)", ExpressionAttributeNames: { "#pk": PK } }),
+      },
+    },
+  ];
+}
+
 export type Outcome = "ended" | "timed-out" | "released";
 
 export interface Settlement {
@@ -121,6 +149,12 @@ export async function settle(
   const immersionSeconds = Math.min(partnerSeconds, chargedSeconds);
   const refund = session.reservedSeconds - chargedSeconds;
 
+  // Retried when another Session of this Learner settled at the same moment and changed the Streak under us.
+  for (let attempt = 1; ; attempt++) {
+  const streakItem =
+    outcome === "released"
+      ? undefined
+      : (await deps.db.send(new GetCommand({ TableName: deps.tableName, Key: { [PK]: learnerKey(sub), [SK]: STREAK_SORT_KEY }, ConsistentRead: true }))).Item;
   try {
     await deps.db.send(
       new TransactWriteCommand({
@@ -156,18 +190,21 @@ export async function settle(
                   },
                 },
               ]),
+          ...streakUpdate(deps, sub, session, outcome, streakItem),
         ],
       }),
     );
     return { chargedSeconds, immersionSeconds };
   } catch (err) {
-    if (err instanceof TransactionCanceledException && err.CancellationReasons?.[0]?.Code === "ConditionalCheckFailed") {
+    if (err instanceof TransactionCanceledException) {
       const stored = await getSession(deps, sub, session.sessionId);
       if (stored && stored.status !== "active") {
         return { chargedSeconds: stored.chargedSeconds ?? 0, immersionSeconds: stored.immersionSeconds ?? 0 };
       }
+      if (stored && attempt < 3) continue;
     }
     throw err;
+  }
   }
 }
 

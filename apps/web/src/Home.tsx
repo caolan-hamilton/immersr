@@ -23,6 +23,18 @@ export function Home({ me, language, onLanguageChange, onStartSession }: HomePro
     <div className="flex grow flex-col">
       <header className="flex items-center justify-between border-b-[3px] border-line bg-body px-5 py-[18px] text-on-body">
         <span className="font-display text-[26px] font-black">Immersr</span>
+        <span className="flex items-center gap-1.5 rounded-full border-[2.5px] border-line bg-you px-3 py-[5px] text-[13px] font-bold text-[#141414] shadow-chunk-sm">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path
+              d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-3 2-4 2-7 2 1 3 3 3 5 0-3 0-6 0-9z"
+              fill="#E8641E"
+              stroke="#141414"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {me.streak === 0 ? "No streak yet" : `${me.streak}-day streak`}
+        </span>
       </header>
       <div className="flex grow flex-col gap-3.5 px-5 pt-[18px]">
         <div className="chunk flex items-center gap-3 px-3.5 py-3">

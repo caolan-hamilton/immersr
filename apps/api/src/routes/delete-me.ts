@@ -57,7 +57,7 @@ export const deleteMe =
   (deps: Deps) =>
   async (event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyStructuredResultV2> => {
     const { sub } = callerOf(event);
-    const items = await learnerItems(deps, sub);
+    let items = await learnerItems(deps, sub);
 
     const active = items.filter(
       (item) => String(item[SK]).startsWith("SESSION#") && item.status === "active",
@@ -74,6 +74,8 @@ export const deleteMe =
       }
       await settle(deps, sub, session, "ended", 0);
     }
+    // Settling can create items (Immersion time, the Streak) that the first listing didn't see.
+    if (active.length > 0) items = await learnerItems(deps, sub);
 
     await deleteAll(
       deps,
