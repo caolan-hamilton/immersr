@@ -18,6 +18,8 @@ export const MeResponse = z.object({
     resetsAt: z.iso.datetime(),
   }),
   immersion: z.record(z.string(), z.number().int().nonnegative()),
+  /** Consecutive local days with a Session, ending today or yesterday; 0 once a day has been missed. */
+  streak: z.number().int().nonnegative(),
 });
 export type MeResponse = z.infer<typeof MeResponse>;
 
@@ -39,6 +41,8 @@ export const CreateSessionRequest = z.object({
   language: Language,
   level: Level,
   topic: z.string().transform(cutTopic).pipe(z.string().min(1)),
+  /** The Learner's IANA time zone, which decides the local day for the Streak. Invalid or missing means UTC. */
+  timeZone: z.string().optional(),
 });
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequest>;
 

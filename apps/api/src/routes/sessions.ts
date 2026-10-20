@@ -5,7 +5,7 @@ import { CreateSessionRequest, type CreateSessionResponse } from "@immersr/share
 import type { Deps } from "../lib/deps.ts";
 import { json } from "../lib/http.ts";
 import { buildSessionConfig } from "../lib/instructions.ts";
-import { allowanceSeconds, callerOf } from "../lib/learner.ts";
+import { allowanceSeconds, callerOf, localDay } from "../lib/learner.ts";
 import { MAX_SESSION_SECONDS } from "../lib/limits.ts";
 import { reserve, sessionKey, settle } from "../lib/metering.ts";
 
@@ -33,7 +33,7 @@ export const createSession =
     if (!parsed.success) {
       return json(400, { error: "Invalid request.", issues: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) });
     }
-    const { sdpOffer, language, level, topic } = parsed.data;
+    const { sdpOffer, language, level, topic, timeZone } = parsed.data;
 
     // Before anything is reserved or created, so a flagged Topic changes no usage.
     try {
@@ -55,7 +55,15 @@ export const createSession =
       sub,
       isAdmin,
       allowanceSeconds: allowanceSeconds(caller),
-      session: { sessionId, language, level, topic, startedAt: now.toISOString(), endsAt: endsAt.toISOString() },
+      session: {
+        sessionId,
+        language,
+        level,
+        topic,
+        startedAt: now.toISOString(),
+        endsAt: endsAt.toISOString(),
+        localDay: localDay(now, timeZone),
+      },
     });
     if (!reservation.ok) return json(429, { reason: reservation.reason });
 
