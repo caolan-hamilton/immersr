@@ -17,7 +17,7 @@ describe("Streak", () => {
     }
   });
 
-  const body = { sdpOffer: "v=0 offer", language: "pt-PT", level: "A2", topic: "my weekend" };
+  const body = { sdpOffer: "v=0 offer", language: "pt-PT", level: "beginner", topic: "my weekend" };
   const owner = (sub: string) => ({ sub, groups: ["admins"] });
 
   /** Starts a Session at `at` and returns what's needed to settle it. */

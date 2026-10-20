@@ -15,7 +15,7 @@ describe("POST /api/translations", () => {
     await testDb.send(new DeleteCommand({ TableName: table.tableName, Key: { PK: "GLOBAL", SK: "USAGE#2026-10-19" } }));
   });
 
-  const valid = { sdpOffer: "v=0 offer", language: "pt-PT", level: "A2", topic: "my weekend" };
+  const valid = { sdpOffer: "v=0 offer", language: "pt-PT", level: "beginner", topic: "my weekend" };
   const usage = async (sub: string) =>
     (await testDb.send(new GetCommand({ TableName: table.tableName, Key: { PK: `LEARNER#${sub}`, SK: "USAGE#2026-10-19" } })))
       .Item;

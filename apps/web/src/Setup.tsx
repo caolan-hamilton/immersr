@@ -1,4 +1,4 @@
-import { LANGUAGES, LEVELS, TOPIC_MAX_LENGTH, type Language, type Level } from "@immersr/shared";
+import { LANGUAGES, LEVELS, LEVEL_HINTS, LEVEL_NAMES, TOPIC_MAX_LENGTH, type Language, type Level } from "@immersr/shared";
 import { Blob } from "./Blob.tsx";
 import { formatDuration } from "./format.ts";
 import { TopBar, type NavScreen } from "./Nav.tsx";
@@ -94,7 +94,7 @@ export function Setup(props: SetupProps) {
             </fieldset>
             <fieldset>
               <legend className="mb-2 font-bold">Level</legend>
-              <div className="grid grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                 {LEVELS.map((l) => (
                   <button
                     key={l}
@@ -104,7 +104,8 @@ export function Setup(props: SetupProps) {
                     onClick={() => props.onLevelChange(l)}
                     style={l === level ? { background: theme.body, color: theme.onBody } : undefined}
                   >
-                    {l}
+                    <span className="block font-bold">{LEVEL_NAMES[l]}</span>
+                    <span className="block text-sm font-normal">{LEVEL_HINTS[l]}</span>
                   </button>
                 ))}
               </div>
@@ -154,7 +155,7 @@ export function Setup(props: SetupProps) {
             </div>
             <div className="flex flex-col gap-2.5 p-[18px]">
               <div className="font-display text-2xl font-black">
-                {theme.short} · {level}
+                {theme.short} · {LEVEL_NAMES[level]}
               </div>
               <div className="text-[15px]">
                 Topic: <b>{topic.trim() || "anything"}</b>

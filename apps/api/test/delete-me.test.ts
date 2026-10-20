@@ -33,7 +33,7 @@ describe("DELETE /api/me", () => {
       httpEvent({
         method: "POST",
         path: "/api/sessions",
-        body: { sdpOffer: "v=0 offer", language: "pt-PT", level: "A2", topic: "my weekend" },
+        body: { sdpOffer: "v=0 offer", language: "pt-PT", level: "beginner", topic: "my weekend" },
         sub,
       }),
     );

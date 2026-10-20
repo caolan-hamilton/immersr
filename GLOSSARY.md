@@ -21,7 +21,7 @@ The language the Learner is acquiring and the Partner speaks.
 _Avoid_: Foreign language, L2
 
 **Level**:
-The Learner's self-chosen CEFR band (A1, A2, B1 or B2) for a Session, which sets how simply the Partner speaks.
+The Learner's self-chosen band (Superbeginner, Beginner or Intermediate) for a Session, which sets how simply and slowly the Partner speaks.
 _Avoid_: Difficulty, proficiency, skill
 
 **Session**:
