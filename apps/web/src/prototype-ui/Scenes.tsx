@@ -170,7 +170,7 @@ function France() {
   );
 }
 
-export function Scene({ lang, height }: { lang: Lang; height: number }) {
+export function Scene({ lang, height }: { lang: Lang; height: number | string }) {
   return (
     <svg viewBox="0 0 400 420" width="100%" height={height} preserveAspectRatio="xMidYMax slice" aria-hidden="true" style={{ display: "block" }}>
       {lang === "pt-PT" && <Portugal />}
