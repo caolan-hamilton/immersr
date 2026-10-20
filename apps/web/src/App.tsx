@@ -1,12 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { MeResponse } from "@immersr/shared";
 import { Account } from "./Account.tsx";
-import { Blob } from "./Blob.tsx";
 import { Home } from "./Home.tsx";
-import { Scene } from "./Scenes.tsx";
+import { Landing } from "./Landing.tsx";
 import { SessionPanel } from "./SessionPanel.tsx";
 import { THEMES, themeVars, useCurrentLanguage } from "./themes.ts";
-import { completeSignInIfRedirected, getIdToken, isSignedIn, signIn } from "./auth.ts";
+import { completeSignInIfRedirected, getIdToken, isSignedIn } from "./auth.ts";
 
 type State =
   | { kind: "loading" }
@@ -46,7 +45,7 @@ export function App() {
       <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-bg sm:border-x-[3px] sm:border-line">
         <div aria-live="polite" className="flex grow flex-col">
           {state.kind === "loading" && <p className="p-5">Loading…</p>}
-          {state.kind === "signed-out" && <SignedOut language={language} />}
+          {state.kind === "signed-out" && <Landing language={language} />}
           {state.kind === "error" && (
             <p className="p-5">
               <span className="dot bad" /> Something went wrong: {state.message}
@@ -76,30 +75,6 @@ export function App() {
         </div>
         {state.kind === "home" && screen !== "session" && <Nav current={screen} go={setScreen} />}
       </main>
-    </div>
-  );
-}
-
-function SignedOut({ language }: { language: keyof typeof THEMES }) {
-  const theme = THEMES[language];
-  return (
-    <div className="flex grow flex-col">
-      <div className="relative border-b-[3px] border-line">
-        <Scene language={language} height={300} />
-        <div className="absolute inset-x-0 bottom-8 flex justify-center">
-          <Blob color={theme.body} mood="happy" size={160} label="Blob waving hello" />
-        </div>
-      </div>
-      <div className="flex grow flex-col gap-4 px-5 pb-7 pt-5">
-        <h1 className="font-display text-[40px] font-black">Immersr</h1>
-        <p className="text-lg leading-snug">
-          Live conversation in the language you're acquiring. <b>They speak it. You answer in English.</b>
-        </p>
-        <div className="grow" />
-        <button type="button" className="chunk-btn bg-card text-ink" onClick={() => void signIn()}>
-          Sign in with Google
-        </button>
-      </div>
     </div>
   );
 }
