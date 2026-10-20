@@ -168,8 +168,8 @@ function Nav({ current, go }: { current: "home" | "account"; go(s: Screen): void
 function ScenePanel({ theme, mood, size, bottom, label, children }: { theme: Theme; mood: BlobMood; size: number; bottom: number; label?: string; children?: ReactNode }) {
   return (
     <>
-      <div style={{ position: "absolute", inset: 0 }}>
-        <Scene lang={theme.lang} height="100%" />
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+        <Scene lang={theme.lang} height="100%" fit="contain" />
       </div>
       {children}
       <div style={{ position: "absolute", left: 0, right: 0, bottom, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
