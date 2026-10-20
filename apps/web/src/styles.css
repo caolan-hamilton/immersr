@@ -45,6 +45,8 @@
   --color-body: var(--body);
   --color-accent: var(--accent);
   --color-on-body: var(--on-body);
+  /* The desktop layout starts here (`desk:` variants). Below it, every screen keeps its phone layout. */
+  --breakpoint-desk: 900px;
   --font-display: Fraunces, Georgia, serif;
   --font-sans: "DM Sans", system-ui, sans-serif;
   --shadow-chunk: 4px 4px 0 var(--shadow);
@@ -76,6 +78,16 @@ body {
   }
   .pill {
     @apply rounded-full border-[2.5px] border-line bg-card px-3 py-1 text-[13px] font-bold shadow-chunk-sm;
+  }
+  /* A link in the desktop top bar. */
+  .toplink {
+    @apply min-h-11 cursor-pointer rounded-full border-[2.5px] border-transparent bg-transparent px-4 text-[15px] font-bold text-inherit;
+  }
+  .toplink[aria-current="page"] {
+    @apply border-line bg-card text-ink shadow-chunk-sm;
+  }
+  .toplink:focus-visible {
+    @apply outline-[3px] outline-offset-2 outline-current;
   }
   .chunk-btn:active,
   .icon-btn:active,

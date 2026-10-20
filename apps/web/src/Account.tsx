@@ -24,8 +24,8 @@ export function Account() {
   }
 
   return (
-    <div className="flex grow flex-col gap-3.5 p-5">
-      <h1 className="font-display text-3xl font-black">Account</h1>
+    <div className="flex grow flex-col gap-3.5 p-5 desk:mx-auto desk:w-full desk:max-w-[600px] desk:grow-0 desk:gap-4 desk:px-8 desk:pb-12 desk:pt-8">
+      <h1 className="font-display text-3xl font-black desk:text-[40px]">Account</h1>
       <div className="chunk px-4 py-3.5">
         <div className="font-bold">Signed in with Google</div>
         {email && <div className="muted break-all">{email}</div>}
@@ -34,7 +34,7 @@ export function Account() {
       <a href="#privacy" className="inline-flex min-h-11 items-center font-bold text-ink underline">
         Privacy: what Immersr stores
       </a>
-      <button type="button" className="chunk-btn bg-card text-ink" onClick={() => void signOut()}>
+      <button type="button" className="chunk-btn bg-card text-ink desk:self-start desk:px-9" onClick={() => void signOut()}>
         Sign out
       </button>
       {!confirming ? (

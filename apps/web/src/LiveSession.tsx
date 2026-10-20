@@ -39,15 +39,23 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
     if (list && following.current) list.scrollTop = list.scrollHeight;
   }, [turns.length, draft, listeningMode]);
   return (
-    <div className="flex grow flex-col">
-      <div className="relative border-b-[3px] border-line">
-        <Scene language={language} height={listeningMode ? 470 : 300} />
-        <div className="absolute inset-x-3.5 top-3.5 flex items-start justify-between gap-2">
+    // One tree for both layouts, so resizing never remounts it. On a phone the parts stack. On a wide window it is a
+    // grid: the scene on the left, the Transcript column on the right (gone in Listening mode), then the controls.
+    <div
+      className={`flex grow flex-col desk:grid desk:min-h-0 desk:grid-rows-[minmax(0,1fr)_auto_auto] ${
+        listeningMode ? "desk:grid-cols-1" : "desk:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
+      }`}
+    >
+      <div className="relative border-b-[3px] border-line desk:col-start-1 desk:row-start-1 desk:min-h-0 desk:overflow-hidden desk:border-b-0">
+        <div className="desk:absolute desk:inset-0">
+          <Scene language={language} className={`${listeningMode ? "h-[470px]" : "h-[300px]"} desk:h-full`} />
+        </div>
+        <div className="absolute inset-x-3.5 top-3.5 flex items-start justify-between gap-2 desk:inset-x-[18px] desk:top-[18px]">
           <span className="pill min-w-0 truncate bg-white text-[#141414]">
             {theme.short} · {level} · {topic}
           </span>
           <span
-            className="pill shrink-0 bg-you font-display text-base text-[#141414]"
+            className="pill shrink-0 bg-you font-display text-base text-[#141414] desk:text-lg"
             role="timer"
             aria-label="Time left in this Session"
           >
@@ -59,6 +67,7 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
             color={theme.body}
             mood={paused ? "idle" : partner}
             size={listeningMode ? 210 : 150}
+            className={listeningMode ? "desk:h-auto desk:w-[300px]" : "desk:h-auto desk:w-[240px]"}
             label={`Blob, the Partner, is ${partnerLabel.replace("…", "").toLowerCase()}`}
           />
           <span className="pill bg-body text-on-body" aria-live="polite">
@@ -67,58 +76,73 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
         </div>
       </div>
       {muted && (
-        <p role="status" className="m-0 border-b-[3px] border-line bg-you px-4 py-2 text-sm font-bold text-[#141414]">
+        <p role="status" className="m-0 border-b-[3px] border-line bg-you px-4 py-2 text-sm font-bold text-[#141414] desk:col-span-full desk:row-start-2 desk:border-b-0 desk:border-t-[3px]">
           Your mic is muted. The Partner keeps talking.
         </p>
       )}
-      {listeningMode ? (
-        <p className="m-auto px-4 py-6 text-center text-[15px] text-muted">Listening mode: no Transcript, just listen.</p>
-      ) : (
-      <ul
-        ref={transcript}
-        onScroll={(e) => {
-          const list = e.currentTarget;
-          following.current = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
-        }}
-        className="m-0 flex max-h-[330px] grow list-none flex-col gap-2.5 overflow-y-auto p-0 px-4 py-3.5"
-        aria-label="Transcript"
+      {/* The Transcript column. On a phone it has no box of its own: its parts sit in the page flow. */}
+      <div
+        className={`contents ${listeningMode ? "desk:hidden" : "desk:col-start-2 desk:row-start-1 desk:flex desk:min-h-0 desk:flex-col desk:border-l-[3px] desk:border-line"}`}
       >
-        {turns.map((turn, i) => {
-          if (turn.speaker === "Learner") {
-            return (
-              <li key={i} className="chunk max-w-[78%] self-end bg-you px-3 py-2.5 text-[15px] text-[#141414]">
-                {turn.text}
-              </li>
-            );
-          }
-          const translation = translations[i];
-          return (
-            <li key={i}>
-              <button
-                type="button"
-                className="chunk flex min-h-11 w-full cursor-pointer flex-col gap-1 px-3 py-2.5 text-left font-[inherit] text-ink"
-                aria-expanded={translation?.open ?? false}
-                onClick={() => onToggleTranslation(i)}
-              >
-                <span className="text-[15px] leading-snug">{turn.text}</span>
-                {translation?.open && translation.status === "loading" && <span className="text-[13px] text-muted">Translating…</span>}
-                {translation?.open && translation.status === "done" && <span className="text-[13px] text-muted">{translation.text}</span>}
-                {translation?.open && translation.status === "failed" && (
-                  <span role="alert" className="text-[13px] text-bad">
-                    {translation.message} Tap to try again.
-                  </span>
-                )}
-                {!translation?.open && <span className="text-xs text-muted">Tap to translate</span>}
-              </button>
-            </li>
-          );
-        })}
-        {draft && (
-          <li className="chunk px-3 py-2.5 text-[15px] leading-snug text-muted">{draft}</li>
+        <div className="hidden items-baseline justify-between border-b-[3px] border-line bg-card px-5 py-3.5 desk:flex">
+          <span className="font-display text-xl font-black">Transcript</span>
+          <span className="text-[13px] text-muted">Click a line to translate it</span>
+        </div>
+        {listeningMode ? (
+          <p className="m-auto px-4 py-6 text-center text-[15px] text-muted">Listening mode: no Transcript, just listen.</p>
+        ) : (
+          <ul
+            ref={transcript}
+            onScroll={(e) => {
+              const list = e.currentTarget;
+              following.current = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
+            }}
+            className="m-0 flex max-h-[330px] grow list-none flex-col gap-2.5 overflow-y-auto p-0 px-4 py-3.5 desk:max-h-none desk:min-h-0 desk:gap-3 desk:p-5"
+            aria-label="Transcript"
+          >
+            {turns.map((turn, i) => {
+              if (turn.speaker === "Learner") {
+                return (
+                  <li key={i} className="chunk max-w-[78%] self-end bg-you px-3 py-2.5 text-[15px] text-[#141414] desk:text-base">
+                    {turn.text}
+                  </li>
+                );
+              }
+              const translation = translations[i];
+              return (
+                <li key={i} className="desk:max-w-[88%]">
+                  <button
+                    type="button"
+                    className="chunk flex min-h-11 w-full cursor-pointer flex-col gap-1 px-3 py-2.5 text-left font-[inherit] text-ink"
+                    aria-expanded={translation?.open ?? false}
+                    onClick={() => onToggleTranslation(i)}
+                  >
+                    <span className="text-[15px] leading-snug desk:text-base">{turn.text}</span>
+                    {translation?.open && translation.status === "loading" && <span className="text-[13px] text-muted">Translating…</span>}
+                    {translation?.open && translation.status === "done" && <span className="text-[13px] text-muted">{translation.text}</span>}
+                    {translation?.open && translation.status === "failed" && (
+                      <span role="alert" className="text-[13px] text-bad">
+                        {translation.message} <span className="desk:hidden">Tap</span>
+                        <span className="hidden desk:inline">Click</span> to try again.
+                      </span>
+                    )}
+                    {!translation?.open && (
+                      <span className="text-xs text-muted">
+                        <span className="desk:hidden">Tap to translate</span>
+                        <span className="hidden desk:inline">Click to translate</span>
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+            {draft && (
+              <li className="chunk px-3 py-2.5 text-[15px] leading-snug text-muted desk:text-base">{draft}</li>
+            )}
+          </ul>
         )}
-      </ul>
-      )}
-      <div className="flex items-center gap-2 border-t-[3px] border-line bg-card px-3.5 pb-[22px] pt-3">
+      </div>
+      <div className="flex items-center gap-2 border-t-[3px] border-line bg-card px-3.5 pb-[22px] pt-3 desk:col-span-full desk:row-start-3 desk:gap-3 desk:px-6 desk:py-3.5">
         <button
           type="button"
           className="icon-btn"
@@ -144,7 +168,7 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
             <rect x="16" y="14" width="5" height="7" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
           </svg>
         </button>
-        <button type="button" className="chunk-btn grow bg-accent text-white" onClick={onEnd}>
+        <button type="button" className="chunk-btn grow bg-accent text-white desk:ml-auto desk:min-w-[200px] desk:grow-0" onClick={onEnd}>
           End
         </button>
       </div>
