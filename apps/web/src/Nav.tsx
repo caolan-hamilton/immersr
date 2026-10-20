@@ -46,7 +46,7 @@ export function TopBar({ current, go, streak }: NavProps & { streak: number }) {
 export function BottomNav({ current, go }: NavProps) {
   const item = "nav-item flex min-h-11 flex-col items-center justify-center gap-1 px-6 text-[13px] font-bold";
   return (
-    <nav aria-label="Main" className="flex justify-around border-t-[3px] border-line bg-card pb-5 pt-2.5 desk:hidden">
+    <nav aria-label="Main" className="sticky bottom-0 z-10 flex justify-around border-t-[3px] border-line bg-card pb-[max(12px,env(safe-area-inset-bottom))] pt-2 desk:hidden">
       <button
         type="button"
         className={`${item} ${current === "home" ? "text-ink" : "text-muted"}`}
