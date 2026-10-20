@@ -90,3 +90,7 @@ API_PROXY=<that Url> pnpm dev:web   # local Vite app talking to your dev API
 ## Deploy
 
 `prod` deploys from GitHub Actions on every push to `main`: typecheck → tests (with DynamoDB Local) → `cdk synth` → `cdk diff` → deploy. It uses GitHub OIDC, so no AWS keys are stored. The one-off setup is in [docs/setup/bootstrap.md](docs/setup/bootstrap.md), and the spend limits and account protections are in [docs/setup/cost-protections.md](docs/setup/cost-protections.md).
+
+## Licence
+
+© 2026 Caolan Hamilton. All rights reserved. The source is public for review, but it may not be copied, modified or redistributed without permission.
