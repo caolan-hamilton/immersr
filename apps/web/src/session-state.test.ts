@@ -98,3 +98,68 @@ describe("Turn translation", () => {
     expect(run([{ kind: "toggle-translation", index: 1 }], withTurn).translations[0]).toBeUndefined();
   });
 });
+
+describe("Mute", () => {
+  it("mutes and unmutes without touching the Partner state", () => {
+    const talking = run([realtime("output_audio_buffer.started")]);
+    const muted = run([{ kind: "mute" }], talking);
+    expect(muted).toMatchObject({ muted: true, paused: false, partner: "speaking" });
+    expect(run([{ kind: "unmute" }], muted).muted).toBe(false);
+  });
+
+  it("keeps the Partner's events flowing while muted", () => {
+    expect(run([{ kind: "mute" }, realtime("output_audio_buffer.started")]).partner).toBe("speaking");
+  });
+});
+
+describe("Pause", () => {
+  const talking = run([realtime("output_audio_buffer.started"), { kind: "partner-draft", text: "Bom di" }]);
+
+  it("pauses and drops the unfinished Partner draft", () => {
+    expect(run([{ kind: "pause" }], talking)).toMatchObject({ paused: true, draft: "" });
+  });
+
+  it("keeps the Partner state frozen while realtime events arrive", () => {
+    const paused = run([{ kind: "pause" }], talking);
+    const after = run(["output_audio_buffer.stopped", "input_audio_buffer.speech_stopped", "response.done"].map(realtime), paused);
+    expect(after).toEqual(paused);
+  });
+
+  it("resumes with the Partner thinking, because it is asked to carry on", () => {
+    const resumed = run([{ kind: "pause" }, { kind: "resume" }], talking);
+    expect(resumed).toMatchObject({ paused: false, partner: "thinking" });
+    expect(run([realtime("output_audio_buffer.started")], resumed).partner).toBe("speaking");
+  });
+
+  it("keeps Turns that arrive while paused", () => {
+    const state = run([{ kind: "pause" }, { kind: "turn", speaker: "Partner", text: "Bom dia" }], talking);
+    expect(state.turns).toEqual([{ speaker: "Partner", text: "Bom dia" }]);
+  });
+
+  it("stays muted through a pause and resume", () => {
+    expect(run([{ kind: "mute" }, { kind: "pause" }, { kind: "resume" }]).muted).toBe(true);
+  });
+
+  it("ignores resume when not paused", () => {
+    expect(run([{ kind: "resume" }], talking)).toBe(talking);
+  });
+});
+
+describe("Listening mode", () => {
+  it("toggles on and off", () => {
+    const on = run([{ kind: "toggle-listening-mode" }]);
+    expect(on.listeningMode).toBe(true);
+    expect(run([{ kind: "toggle-listening-mode" }], on).listeningMode).toBe(false);
+  });
+
+  it("keeps the Transcript while hidden, and survives a new Session's reset; mute and pause do not", () => {
+    const state = run([
+      { kind: "toggle-listening-mode" },
+      { kind: "turn", speaker: "Partner", text: "Bom dia" },
+      { kind: "mute" },
+      { kind: "pause" },
+    ]);
+    expect(state.turns).toHaveLength(1);
+    expect(run([{ kind: "reset" }], state)).toEqual({ ...initialSessionState, listeningMode: true });
+  });
+});

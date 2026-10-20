@@ -40,6 +40,13 @@ export interface LiveSession {
   end(): void;
   /** Seconds the Partner has spoken so far: output audio tokens ÷ 20 from each `response.done`. */
   partnerSeconds(): number;
+  /** Mute: the microphone track sends silence; the Partner keeps talking. */
+  setMuted(muted: boolean): void;
+  /**
+   * Pause: cancels any response, turns off the microphone and silences the Partner's audio.
+   * Resume re-enables both and asks the Partner to carry on.
+   */
+  setPaused(paused: boolean): void;
 }
 
 /** End was refused or couldn't be delivered. `status` is the HTTP status, absent when the request never arrived. */
@@ -117,6 +124,10 @@ export async function startSession(
   };
 
   try {
+    let muted = false;
+    let paused = false;
+    // The microphone sends audio only when the Learner is neither muted nor paused.
+    const applyMicrophone = () => mic.getAudioTracks().forEach((track) => (track.enabled = !muted && !paused));
     const audio = new Audio();
     audio.autoplay = true;
     pc.ontrack = (e) => (audio.srcObject = e.streams[0] ?? null);
@@ -192,6 +203,17 @@ export async function startSession(
       endsAt: created.endsAt,
       end: close,
       partnerSeconds: () => outputAudioTokens / 20,
+      setMuted: (value) => {
+        muted = value;
+        applyMicrophone();
+      },
+      setPaused: (value) => {
+        if (value === paused) return;
+        paused = value;
+        applyMicrophone();
+        audio.muted = paused;
+        if (channel.readyState === "open") channel.send(JSON.stringify({ type: paused ? "response.cancel" : "response.create" }));
+      },
     };
   } catch (err) {
     close();
