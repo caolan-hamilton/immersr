@@ -107,7 +107,8 @@ export function getEmail(): string | undefined {
   const idToken = readTokens()?.idToken;
   if (!idToken) return undefined;
   try {
-    const payload = idToken.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/");
+    const base64 = idToken.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
     const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payload), (c) => c.charCodeAt(0)))) as {
       email?: unknown;
     };

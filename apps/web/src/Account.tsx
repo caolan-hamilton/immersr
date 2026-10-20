@@ -60,7 +60,7 @@ export function Account() {
           </p>
           <button
             type="button"
-            className="chunk-btn bg-[#c8352a] text-white"
+            className="chunk-btn bg-bad text-on-bad"
             onClick={() => void deleteAccount()}
             disabled={deleting}
           >
