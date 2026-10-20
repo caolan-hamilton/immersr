@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { getIdToken, signOut } from "./auth.ts";
+import { getEmail, getIdToken, signOut } from "./auth.ts";
 
 // The Account screen: sign out, or erase everything (GDPR) after an explicit confirmation.
 export function Account() {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string>();
+  const email = getEmail();
 
   async function deleteAccount() {
     setDeleting(true);
@@ -23,20 +24,32 @@ export function Account() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-5">
-      <h2 className="font-display text-3xl font-black">Account</h2>
+    <div className="flex grow flex-col gap-3.5 p-5">
+      <h1 className="font-display text-3xl font-black">Account</h1>
+      <div className="chunk px-4 py-3.5">
+        <div className="font-bold">Signed in with Google</div>
+        {email && <div className="muted break-all">{email}</div>}
+      </div>
+      {/* The privacy content itself is #12; this anchor is where it will live. */}
+      <a href="#privacy" className="inline-flex min-h-11 items-center font-bold text-ink underline">
+        Privacy: what Immersr stores
+      </a>
       <button type="button" className="chunk-btn bg-card text-ink" onClick={() => void signOut()}>
         Sign out
       </button>
       {!confirming ? (
-        <button type="button" className="chunk-btn bg-card text-ink" onClick={() => setConfirming(true)}>
+        <button
+          type="button"
+          className="min-h-11 cursor-pointer self-start p-0 font-bold text-bad underline"
+          onClick={() => setConfirming(true)}
+        >
           Delete my account
         </button>
       ) : (
         <div role="alertdialog" aria-labelledby="delete-title" className="chunk flex flex-col gap-3 p-4">
-          <h3 id="delete-title" className="font-display text-xl font-black">
+          <h2 id="delete-title" className="font-display text-xl font-black">
             Delete your account?
-          </h3>
+          </h2>
           <p>
             This permanently removes your account, your Immersion time in every language, your Session history and your
             usage records. It can't be undone. If a Session is in progress, it ends first.
@@ -47,14 +60,14 @@ export function Account() {
           </p>
           <button
             type="button"
-            className="chunk-btn bg-accent text-white"
+            className="chunk-btn bg-[#c8352a] text-white"
             onClick={() => void deleteAccount()}
             disabled={deleting}
           >
-            {deleting ? "Deleting…" : "Yes, delete everything"}
+            {deleting ? "Deleting…" : "Delete for good"}
           </button>
           <button type="button" className="chunk-btn bg-card text-ink" onClick={() => setConfirming(false)} disabled={deleting}>
-            Cancel
+            Keep my account
           </button>
           {error && (
             <p role="alert">
