@@ -1,6 +1,8 @@
 // Request and response shapes shared by the web app and the API.
 import { z } from "zod";
 
+export * from "./milestones.ts";
+
 export const HealthResponse = z.object({
   status: z.literal("ok"),
   stage: z.string(),

@@ -1,30 +1,124 @@
+@import "tailwindcss";
+
+/* Theme tokens: defined once for light and dark. Dark follows the system setting; there is no in-app toggle. */
 :root {
-  --bg: #fafaf9;
-  --fg: #1c1917;
-  --muted: #78716c;
-  --ok: #15803d;
+  --bg: #fff7e8;
+  --card: #ffffff;
+  --ink: #141414;
+  --muted: #4d4a42;
+  --line: #141414;
+  --shadow: #141414;
+  --track: #ece2cc;
+  --you: #f2c230;
   --bad: #b91c1c;
+  /* Overridden per Target language by the screen shell. */
+  --body: #1f8a4c;
+  --accent: #d7263d;
+  --on-body: #ffffff;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1c1917;
-    --fg: #f5f5f4;
-    --muted: #a8a29e;
-    --ok: #4ade80;
+    --bg: #14171a;
+    --card: #22262b;
+    --ink: #edeae3;
+    --muted: #a9b0a9;
+    --line: #edeae3;
+    --shadow: rgba(237, 234, 227, 0.35);
+    --track: #3a3f45;
     --bad: #f87171;
   }
 }
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-track: var(--track);
+  --color-you: var(--you);
+  --color-bad: var(--bad);
+  --color-body: var(--body);
+  --color-accent: var(--accent);
+  --color-on-body: var(--on-body);
+  --font-display: Fraunces, Georgia, serif;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --shadow-chunk: 4px 4px 0 var(--shadow);
+  --shadow-chunk-sm: 3px 3px 0 var(--shadow);
+}
+
 body {
   margin: 0;
   background: var(--bg);
-  color: var(--fg);
-  font: 16px/1.5 system-ui, sans-serif;
+  color: var(--ink);
+  font-family: var(--font-sans);
 }
-main {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 48px 16px;
+
+@layer components {
+  .chunk {
+    @apply rounded-[20px] border-[3px] border-line bg-card shadow-chunk;
+  }
+  .chunk-btn {
+    @apply min-h-14 cursor-pointer rounded-[18px] border-[3px] border-line font-display text-[19px] font-black shadow-chunk transition-[transform,box-shadow] duration-75;
+  }
+  .pick {
+    @apply min-h-11 cursor-pointer rounded-[14px] border-[2.5px] border-line bg-card px-3 py-2.5 font-bold text-ink shadow-chunk-sm transition-[transform,box-shadow] duration-75;
+  }
+  .chunk-btn:active,
+  .pick:active {
+    transform: translate(3px, 3px);
+    box-shadow: 1px 1px 0 var(--shadow);
+  }
+  .chunk-btn:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+  .chunk-btn:focus-visible,
+  .pick:focus-visible,
+  .nav-item:focus-visible {
+    @apply outline-[3px] outline-offset-2 outline-ink;
+  }
+}
+
+/* The existing Session flow, styled with the same tokens until it gets its own screens. */
+.session-panel :where(h2) {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem;
+}
+.session-panel :where(p, ul) {
+  margin: 0.5rem 0;
+}
+.session-panel :where(button) {
+  min-height: 44px;
+  padding: 0 14px;
+  cursor: pointer;
+  border: 2.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  box-shadow: 3px 3px 0 var(--shadow);
+}
+.session-panel :where(button:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.session-panel :where(button[type="submit"]) {
+  background: var(--accent);
+  color: #fff;
+}
+.session-panel :where(input, select) {
+  min-height: 44px;
+  max-width: 100%;
+  border: 2.5px solid var(--line);
+  border-radius: 14px;
+  padding: 0 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
 }
 .muted {
   color: var(--muted);
@@ -35,9 +129,6 @@ main {
   height: 10px;
   border-radius: 50%;
   margin-right: 6px;
-}
-.dot.ok {
-  background: var(--ok);
 }
 .dot.bad {
   background: var(--bad);
@@ -57,4 +148,56 @@ main {
 }
 .transcript li {
   margin: 8px 0;
+}
+
+/* Mascot motion: each Partner state has its own movement. */
+.blob {
+  overflow: visible;
+}
+.blob--speaking {
+  animation: blob-bounce 0.6s ease-in-out infinite;
+}
+.blob--speaking .blob__mouth {
+  animation: blob-talk 0.3s ease-in-out infinite alternate;
+  transform-origin: 111px 146px;
+}
+.blob--listening {
+  animation: blob-lean 2.4s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+.blob--thinking {
+  animation: blob-sway 1.8s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+.blob--happy {
+  animation: blob-bounce 0.9s ease-in-out infinite;
+}
+@keyframes blob-bounce {
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@keyframes blob-talk {
+  from {
+    transform: scaleY(0.4);
+  }
+  to {
+    transform: scaleY(1.1);
+  }
+}
+@keyframes blob-lean {
+  50% {
+    transform: rotate(-3deg) translateX(-3px);
+  }
+}
+@keyframes blob-sway {
+  50% {
+    transform: rotate(3deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blob,
+  .blob * {
+    animation: none !important;
+  }
 }
