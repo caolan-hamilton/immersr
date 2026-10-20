@@ -30,7 +30,7 @@ export function Home({ me, language, onLanguageChange, onStartSession }: HomePro
       {/* On a wide window the hero card and a column of stats sit side by side, capped in width. */}
       <div className="flex grow flex-col gap-3 px-5 pt-3.5 desk:mx-auto desk:grid desk:w-full desk:max-w-[1120px] desk:grow-0 desk:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] desk:items-start desk:gap-7 desk:px-8 desk:pb-12 desk:pt-8">
         <div className="chunk flex items-center gap-3 px-3.5 py-2.5 desk:hidden">
-          <Blob color={theme.body} mood="happy" size={76} />
+          <Blob color={theme.body} mood="happy" size={76} followPointer />
           <div>
             <h2 className="font-display text-[26px] font-black">{theme.hello}</h2>
             <p className="text-[15px]">Ready for today's chat in {theme.short}?</p>
@@ -40,7 +40,7 @@ export function Home({ me, language, onLanguageChange, onStartSession }: HomePro
           <div className="relative border-b-[3px] border-line">
             <Scene language={language} className="h-80" />
             <div className="absolute inset-x-0 bottom-[26px] flex justify-center">
-              <Blob color={theme.body} mood="happy" size={170} />
+              <Blob color={theme.body} mood="happy" size={170} followPointer />
             </div>
           </div>
           <div className="flex flex-col gap-2.5 px-6 pb-6 pt-5">
@@ -116,6 +116,18 @@ export function Home({ me, language, onLanguageChange, onStartSession }: HomePro
             );
           })}
         </div>
+        </div>
+        <div className="chunk hidden flex-col gap-2 px-4 py-3.5 desk:flex">
+          <h3 className="font-display text-xl font-black">How Immersr works</h3>
+          <p className="text-[15px]">
+            <strong>Learn by listening.</strong> You pick up a language by understanding lots of it: speech that's slow and
+            simple enough to follow, a little above your level. No drills, no grammar tables. Hours of understanding are
+            what count, so Immersr counts your hours.
+          </p>
+          <p className="text-[15px]">
+            <strong>Crosstalk.</strong> Blob speaks only {theme.short}, at your Level. You answer in English. That's real
+            conversation from day one, without having to speak {theme.short} yet.
+          </p>
         </div>
         </div>
         <div className="grow desk:hidden" />

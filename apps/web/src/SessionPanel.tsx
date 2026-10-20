@@ -52,6 +52,8 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
   // The Target language and Immersion time the running Session started from, for the Summary.
   const startedFrom = useRef<{ language: Language; beforeSeconds: number } | undefined>(undefined);
   const finishing = useRef(false);
+  // Which Start is current; Cancel bumps it so a connection that completes later is hung up.
+  const startAttempt = useRef(0);
   // The Session the server hasn't settled yet, kept so a failed End can be retried.
   // Also saved on the device, so it survives a closed tab or a reload.
   const unsettled = useRef<PendingEnd | undefined>(loadPendingEnd());
@@ -196,6 +198,8 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
       await settleUnsettled();
       if (unsettled.current) return;
     }
+    const attempt = ++startAttempt.current;
+    const cancelled = () => startAttempt.current !== attempt;
     setPhase("connecting");
     setSummary(undefined);
     startedFrom.current = { language, beforeSeconds: immersion[language] ?? 0 };
@@ -204,7 +208,7 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
     dispatch({ kind: "reset" });
     transcriptSession.current = undefined;
     try {
-      live.current = await startSession(
+      const started = await startSession(
         { language, level, topic },
         {
           onRealtimeEvent: (type) => dispatch({ kind: "realtime", type }),
@@ -217,9 +221,26 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
           },
         },
       );
-      transcriptSession.current = live.current.sessionId;
+      if (cancelled()) {
+        // Cancelled while connecting: the server may already hold a Reservation, so hang up and settle it quietly.
+        const pending = { sessionId: started.sessionId, partnerSeconds: 0 };
+        unsettled.current = pending;
+        savePendingEnd(pending);
+        started.end();
+        void deliverPendingEnd(pending).then(
+          () => {
+            if (unsettled.current === pending) unsettled.current = undefined;
+            onSettledRef.current();
+          },
+          () => undefined, // stays saved and unsettled: the next Start or online event retries
+        );
+        return;
+      }
+      live.current = started;
+      transcriptSession.current = started.sessionId;
       setPhase("live");
     } catch (err) {
+      if (cancelled()) return;
       if (err instanceof MicrophoneBlockedError) setMicBlocked(true);
       else if (err instanceof SessionRefusedError) setError(refusalMessage(err.reason, allowance.resetsAt));
       else setError(err instanceof Error ? err.message : String(err));
@@ -227,7 +248,13 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
     }
   };
 
-  if (phase === "live") {
+  const cancelStart = () => {
+    startAttempt.current++;
+    setError(undefined);
+    setPhase("setup");
+  };
+
+  if (phase === "live" || phase === "connecting") {
     return (
       // On a wide window the Session fills the window exactly: the Transcript scrolls inside it, not the page.
       <div className="flex grow flex-col desk:h-dvh">
@@ -252,6 +279,8 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
           }}
           onToggleListeningMode={() => dispatch({ kind: "toggle-listening-mode" })}
           onEnd={() => void finish()}
+          connecting={phase === "connecting"}
+          onCancel={cancelStart}
         />
         {error && (
           <p role="alert" className="m-0 border-t-[3px] border-line bg-card px-4 py-2 text-sm">
@@ -262,12 +291,15 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
     );
   }
 
-  if (phase === "summary" && summary) {
+  // Ending shows the Summary as a skeleton at once; the numbers fill in when the server's result arrives.
+  if (phase === "ending" || phase === "end-failed" || (phase === "summary" && summary)) {
+    const waitingOn = summary ?? startedFrom.current ?? { language, beforeSeconds: immersion[language] ?? 0 };
     return (
       <Summary
-        language={summary.language}
-        result={summary.result}
-        beforeSeconds={summary.beforeSeconds}
+        language={waitingOn.language}
+        result={phase === "summary" ? summary?.result : undefined}
+        endFailure={phase === "end-failed" && error ? { message: error, onRetry: () => void settleUnsettled() } : undefined}
+        beforeSeconds={waitingOn.beforeSeconds}
         onBackToHome={() => {
           setPhase("setup");
           onBack();
@@ -298,36 +330,5 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
     );
   }
 
-  return (
-    <div className="flex grow flex-col">
-      <header className="flex items-center justify-between border-b-[3px] border-line bg-body px-5 py-[18px] text-on-body">
-        <span className="font-display text-[26px] font-black">Immersr</span>
-      </header>
-      <div className="session-panel p-5">
-      <h2>Talk to the Partner</h2>
-      {phase === "connecting" && <p>Connecting…</p>}
-      {phase === "ending" && <p>Ending the Session…</p>}
-      {phase === "end-failed" && (
-        <p>
-          <button onClick={() => void settleUnsettled()}>Retry ending the Session</button>
-        </p>
-      )}
-      {error && (
-        <p role="alert">
-          <span className="dot bad" /> {error}
-        </p>
-      )}
-      {/* Translations only work while the Session is live; once it ends the Transcript is plain text. */}
-      {session.turns.length > 0 && (
-        <ul className="transcript">
-          {session.turns.map((turn, i) => (
-            <li key={i}>
-              <b>{turn.speaker === "Partner" ? "Partner" : "You"}:</b> {turn.text}
-            </li>
-          ))}
-        </ul>
-      )}
-      </div>
-    </div>
-  );
+  return null;
 }
