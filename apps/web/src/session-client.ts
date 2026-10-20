@@ -11,6 +11,7 @@ import {
 } from "@immersr/shared";
 import { getIdToken } from "./auth.ts";
 import { isHarmlessRealtimeError } from "./realtime-errors.ts";
+import { pauseEvents } from "./realtime-pause.ts";
 
 export type TurnSpeaker = "Partner" | "Learner";
 
@@ -45,7 +46,7 @@ export interface LiveSession {
   setMuted(muted: boolean): void;
   /**
    * Pause: cancels any response, turns off the microphone and silences the Partner's audio.
-   * Resume re-enables both and asks the Partner to carry on.
+   * Resume re-enables both and asks the Partner to carry on, finishing its sentence if Pause cut it off.
    */
   setPaused(paused: boolean): void;
 }
@@ -136,6 +137,9 @@ export async function startSession(
 
     let draft = "";
     let outputAudioTokens = 0;
+    // Whether the Partner's audio is playing, and whether Pause cut it off mid-Turn.
+    let partnerSpeaking = false;
+    let cutOff = false;
     const channel = pc.createDataChannel("oai-events");
     // Opening the channel is the cue for the Partner to speak first.
     channel.onopen = () => channel.send(JSON.stringify({ type: "response.create" }));
@@ -149,6 +153,13 @@ export async function startSession(
       };
       events.onRealtimeEvent(event.type);
       switch (event.type) {
+        case "output_audio_buffer.started":
+          partnerSpeaking = true;
+          break;
+        case "output_audio_buffer.stopped":
+        case "output_audio_buffer.cleared":
+          partnerSpeaking = false;
+          break;
         case "response.done":
           outputAudioTokens += event.response?.usage?.output_token_details?.audio_tokens ?? 0;
           break;
@@ -217,7 +228,9 @@ export async function startSession(
         paused = value;
         applyMicrophone();
         audio.muted = paused;
-        if (channel.readyState === "open") channel.send(JSON.stringify({ type: paused ? "response.cancel" : "response.create" }));
+        if (paused) cutOff = partnerSpeaking;
+        if (channel.readyState === "open") pauseEvents(paused, cutOff).forEach((e) => channel.send(JSON.stringify(e)));
+        if (!paused) cutOff = false;
       },
     };
   } catch (err) {
