@@ -11,7 +11,7 @@ const STEPS = [
 ];
 
 // The Landing screen for signed-out visitors. On a wide window it splits: the pitch on the left, the scene on the right.
-export function Landing({ language }: { language: Language }) {
+export function Landing({ language, onPrivacy }: { language: Language; onPrivacy(): void }) {
   const theme = THEMES[language];
   return (
     <div className="flex grow flex-col desk:grid desk:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -46,6 +46,13 @@ export function Landing({ language }: { language: Language }) {
             <path d="M12 6c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.4L6.4 10C7.2 7.8 9.4 6 12 6z" fill="#EA4335" />
           </svg>
           Sign in with Google
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-11 cursor-pointer items-center justify-center p-0 font-bold text-ink underline desk:justify-start"
+          onClick={onPrivacy}
+        >
+          Privacy: what Immersr stores
         </button>
       </div>
     </div>
