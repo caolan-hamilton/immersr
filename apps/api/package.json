@@ -12,6 +12,7 @@
     "drift-check": "node scripts/drift-check.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1152.0",
     "@aws-sdk/client-dynamodb": "^3.1152.0",
     "@aws-sdk/client-scheduler": "^3.1152.0",
     "@aws-sdk/client-ssm": "^3.1152.0",

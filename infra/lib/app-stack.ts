@@ -64,8 +64,9 @@ export class AppStack extends Stack {
     // The OpenAI key is a SecureString the owner creates by hand; the Lambda reads it at runtime only.
     const sessionsFn = fn("SessionsFn", "sessions.ts");
     const endSessionFn = fn("EndSessionFn", "end-session.ts");
+    const deleteMeFn = fn("DeleteMeFn", "delete-me.ts"); // hangs up an active Session, so it needs the key too
     const hangUpFn = fn("HangUpFn", "hang-up.ts");
-    for (const f of [sessionsFn, endSessionFn, hangUpFn]) {
+    for (const f of [sessionsFn, endSessionFn, deleteMeFn, hangUpFn]) {
       table.grantReadWriteData(f);
       f.addToRolePolicy(
         new iam.PolicyStatement({
@@ -159,6 +160,17 @@ export class AppStack extends Stack {
       path: "/api/me",
       methods: [apigw.HttpMethod.GET],
       integration: new HttpLambdaIntegration("MeIntegration", meFn),
+      authorizer,
+    });
+
+    deleteMeFn.addEnvironment("USER_POOL_ID", userPool.userPoolId);
+    deleteMeFn.addToRolePolicy(
+      new iam.PolicyStatement({ actions: ["cognito-idp:AdminDeleteUser"], resources: [userPool.userPoolArn] }),
+    );
+    api.addRoutes({
+      path: "/api/me",
+      methods: [apigw.HttpMethod.DELETE],
+      integration: new HttpLambdaIntegration("DeleteMeIntegration", deleteMeFn),
       authorizer,
     });
 

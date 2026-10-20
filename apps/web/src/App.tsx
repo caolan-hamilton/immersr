@@ -75,9 +75,66 @@ function Home({ me, onSessionSettled }: { me: MeResponse; onSessionSettled(): vo
         </ul>
       )}
       <SessionPanel allowance={allowance} onSettled={onSessionSettled} />
+      <Account />
+    </>
+  );
+}
+
+// The Account screen: sign out, or erase everything (GDPR) after an explicit confirmation.
+function Account() {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function deleteAccount() {
+    setDeleting(true);
+    setError(undefined);
+    try {
+      const token = await getIdToken();
+      if (!token) throw new Error("You're signed out. Sign in again to delete your account.");
+      const response = await fetch("/api/me", { method: "DELETE", headers: { authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error(`Something went wrong (${response.status}). Please try again.`);
+      await signOut();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <>
+      <h2>Account</h2>
       <p>
         <button onClick={() => void signOut()}>Sign out</button>
       </p>
+      {!confirming ? (
+        <p>
+          <button onClick={() => setConfirming(true)}>Delete my account</button>
+        </p>
+      ) : (
+        <div role="alertdialog" aria-labelledby="delete-title">
+          <h3 id="delete-title">Delete your account?</h3>
+          <p>This permanently removes your account, your Immersion time in every language, your Session history and your
+            usage records. It can't be undone. If a Session is in progress, it ends first.</p>
+          <p className="muted">
+            Session audio is processed by OpenAI while you talk; we don't store Transcripts, so there is nothing of
+            that to delete here.
+          </p>
+          <p>
+            <button onClick={() => void deleteAccount()} disabled={deleting}>
+              {deleting ? "Deleting…" : "Yes, delete everything"}
+            </button>{" "}
+            <button onClick={() => setConfirming(false)} disabled={deleting}>
+              Cancel
+            </button>
+          </p>
+          {error && (
+            <p>
+              <span className="dot bad" /> {error}
+            </p>
+          )}
+        </div>
+      )}
     </>
   );
 }

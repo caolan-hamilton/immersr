@@ -1,5 +1,10 @@
 import { TranslateClient, TranslateTextCommand } from "@aws-sdk/client-translate";
 import {
+  AdminDeleteUserCommand,
+  CognitoIdentityProviderClient,
+  UserNotFoundException,
+} from "@aws-sdk/client-cognito-identity-provider";
+import {
   ActionAfterCompletion,
   CreateScheduleCommand,
   FlexibleTimeWindowMode,
@@ -27,6 +32,10 @@ export interface OutsideWorld {
   };
   translate: {
     toEnglish(text: string, language: string): Promise<string>;
+  };
+  identity: {
+    /** Deletes the Learner's Cognito user. A user that is already gone counts as success. */
+    deleteUser(sub: string): Promise<void>;
   };
   clock: {
     now(): Date;
@@ -92,6 +101,19 @@ async function moderate(text: string) {
   return { flagged };
 }
 
+async function deleteUser(sub: string) {
+  const userPoolId = process.env.USER_POOL_ID;
+  if (!userPoolId) throw new Error("Missing environment variable USER_POOL_ID");
+  try {
+    // Cognito's admin APIs accept the `sub` in place of the (provider-prefixed) username.
+    await new CognitoIdentityProviderClient({}).send(
+      new AdminDeleteUserCommand({ UserPoolId: userPoolId, Username: sub }),
+    );
+  } catch (err) {
+    if (!(err instanceof UserNotFoundException)) throw err;
+  }
+}
+
 let translateClient: TranslateClient | undefined;
 
 // Amazon Translate takes "pt-PT" as is, but only a bare language code for Spanish and French.
@@ -141,6 +163,7 @@ export function productionOutsideWorld(): OutsideWorld {
     },
     scheduler: { scheduleHangup },
     translate: { toEnglish },
+    identity: { deleteUser },
     clock: { now: () => new Date() },
   };
 }

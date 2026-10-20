@@ -56,6 +56,10 @@ export class Auth extends Construct {
         callbackUrls: [props.siteUrl, "http://localhost:5173"],
         logoutUrls: [props.siteUrl, "http://localhost:5173"],
       },
+      // Short access and ID tokens, so a deleted Learner's token stops working within 15 minutes (ADR 0007).
+      // The web app renews them with the refresh token.
+      accessTokenValidity: Duration.minutes(15),
+      idTokenValidity: Duration.minutes(15),
       refreshTokenValidity: Duration.days(30),
     });
     this.userPoolClient.node.addDependency(google);
