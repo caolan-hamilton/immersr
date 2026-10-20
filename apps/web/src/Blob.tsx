@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { pupilOffset, type Point } from "./gaze.ts";
+
 /** The Mascot. Brows, mouth and hands act out the Partner state. */
 export type BlobMood = "idle" | "speaking" | "listening" | "thinking" | "happy";
 
@@ -28,13 +31,75 @@ interface BlobProps {
   label?: string;
   /** Extra classes, for example `desk:w-[260px] desk:h-auto` to grow Blob on wide screens. */
   className?: string;
+  /** Pupils follow the pointer (or last touch). Opt-in; other screens keep the pose's resting pupils. */
+  followPointer?: boolean;
 }
 
-export function Blob({ color, mood, size = 160, label, className = "" }: BlobProps) {
+/** How long the pointer may sit still before the pupils ease back to the pose. */
+const IDLE_MS = 2500;
+const REST: Point = { x: 0, y: 0 };
+
+/** Blob's gaze offset while `enabled`: follows the pointer once per animation frame, rests when it leaves or idles. */
+function useGaze(enabled: boolean, svg: RefObject<SVGSVGElement | null>): Point {
+  const [offset, setOffset] = useState(REST);
+  useEffect(() => {
+    if (!enabled) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let pointer: Point | null = null;
+    let frame = 0;
+    let idle: ReturnType<typeof setTimeout> | undefined;
+    const update = () => {
+      frame = 0;
+      const box = svg.current?.getBoundingClientRect();
+      if (!box || box.width === 0) {
+        setOffset(REST); // hidden by the layout
+        return;
+      }
+      const eyes = { x: box.left + box.width / 2, y: box.top + (box.height * 102) / 230 };
+      const next = pupilOffset(pointer, eyes, reduced.matches);
+      setOffset((old) => (old.x === next.x && old.y === next.y ? old : next));
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    const rest = () => {
+      pointer = null;
+      schedule();
+    };
+    const onMove = (e: PointerEvent) => {
+      pointer = { x: e.clientX, y: e.clientY };
+      clearTimeout(idle);
+      idle = setTimeout(rest, IDLE_MS);
+      schedule();
+    };
+    const onOut = (e: MouseEvent) => {
+      if (!e.relatedTarget) rest();
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerdown", onMove, { passive: true });
+    document.addEventListener("mouseout", onOut);
+    reduced.addEventListener("change", schedule);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onMove);
+      document.removeEventListener("mouseout", onOut);
+      reduced.removeEventListener("change", schedule);
+      clearTimeout(idle);
+      if (frame) cancelAnimationFrame(frame);
+      setOffset(REST);
+    };
+  }, [enabled, svg]);
+  return offset;
+}
+
+export function Blob({ color, mood, size = 160, label, className = "", followPointer = false }: BlobProps) {
+  const svg = useRef<SVGSVGElement>(null);
+  const gaze = useGaze(followPointer, svg);
   const pose = POSES[mood];
   const stroke = { stroke: INK, strokeWidth: 2.5 };
   return (
     <svg
+      ref={svg}
       viewBox="0 0 220 230"
       width={size}
       height={(size * 230) / 220}
@@ -55,8 +120,10 @@ export function Blob({ color, mood, size = 160, label, className = "" }: BlobPro
           <circle cx={pose.hands[2]} cy={pose.hands[3]} r="11" fill={color} {...stroke} />
           <circle cx="88" cy="102" r="22" fill="#FFFFFF" {...stroke} />
           <circle cx="134" cy="102" r="22" fill="#FFFFFF" {...stroke} />
-          <circle cx={pose.pupils[0]} cy={pose.pupils[1]} r="9" fill={INK} />
-          <circle cx={pose.pupils[2]} cy={pose.pupils[3]} r="9" fill={INK} />
+          <g style={{ transform: `translate(${gaze.x}px, ${gaze.y}px)`, transition: "transform 180ms ease-out" }}>
+            <circle cx={pose.pupils[0]} cy={pose.pupils[1]} r="9" fill={INK} />
+            <circle cx={pose.pupils[2]} cy={pose.pupils[3]} r="9" fill={INK} />
+          </g>
           <path d={pose.brows[0]} stroke={INK} strokeWidth="7" fill="none" strokeLinecap="round" />
           <path d={pose.brows[1]} stroke={INK} strokeWidth="7" fill="none" strokeLinecap="round" />
           {pose.mouth === "open" && <ellipse className="blob__mouth" cx="111" cy="146" rx="11" ry="9" fill={INK} />}
