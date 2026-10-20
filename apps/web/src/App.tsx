@@ -18,7 +18,8 @@ type Screen = "home" | "session" | "account";
 async function loadMe(): Promise<State> {
   const token = await getIdToken();
   if (!token) return { kind: "signed-out" };
-  const response = await fetch("/api/me", { headers: { authorization: `Bearer ${token}` } });
+  const timeZone = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const response = await fetch(`/api/me?timeZone=${timeZone}`, { headers: { authorization: `Bearer ${token}` } });
   if (response.status === 401) return { kind: "signed-out" };
   if (!response.ok) throw new Error(`API returned ${response.status}`);
   return { kind: "home", me: MeResponse.parse(await response.json()) };

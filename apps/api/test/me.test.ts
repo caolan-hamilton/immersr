@@ -21,6 +21,7 @@ describe("GET /api/me", () => {
     expect(MeResponse.parse(parseBody(result))).toEqual({
       allowance: { usedSeconds: 0, limitSeconds: 900, resetsAt: "2026-10-20T00:00:00.000Z" },
       immersion: {},
+      streak: 0,
     });
   });
 
@@ -47,6 +48,7 @@ describe("GET /api/me", () => {
     expect(parseBody(result)).toEqual({
       allowance: { usedSeconds: 300, limitSeconds: 900, resetsAt: "2026-10-20T00:00:00.000Z" },
       immersion: { es: 120, fr: 45 },
+      streak: 0,
     });
   });
 });
