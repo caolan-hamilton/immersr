@@ -1,6 +1,6 @@
 // Live language drift check: a text-only, by-hand run against the real model with the production
 // instruction builder. It costs real money (a fraction of a cent) and is NOT part of CI.
-// Usage: pnpm drift-check [--language pt-PT] [--level A1]   (see docs/drift-check.md)
+// Usage: pnpm drift-check [--language pt-PT] [--level superbeginner]   (see docs/drift-check.md)
 import { parseArgs } from "node:util";
 import { LANGUAGES, LEVELS, type Language, type Level } from "@immersr/shared";
 import { buildInstructions, REALTIME_MODEL } from "../src/lib/instructions.ts";
@@ -28,7 +28,7 @@ function choose<T extends string>(name: string, allowed: readonly T[], value: st
 
 const onlyLanguage = choose("language", LANGUAGES, values.language);
 const languages: readonly Language[] = onlyLanguage ? [onlyLanguage] : LANGUAGES;
-const level: Level = choose("level", LEVELS, values.level) ?? "A1";
+const level: Level = choose("level", LEVELS, values.level) ?? "superbeginner";
 
 type RealtimeEvent = { type: string; text?: string; error?: unknown; response?: { status?: string } };
 

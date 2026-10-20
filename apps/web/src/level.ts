@@ -1,15 +1,13 @@
 import { useState } from "react";
-import { LEVELS, type Level } from "@immersr/shared";
+import { levelFromStored, type Level } from "@immersr/shared";
 
 const STORAGE_KEY = "immersr.level";
-const DEFAULT_LEVEL: Level = "A1";
 
 function readLevel(): Level {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return LEVELS.find((level) => level === stored) ?? DEFAULT_LEVEL;
+    return levelFromStored(localStorage.getItem(STORAGE_KEY));
   } catch {
-    return DEFAULT_LEVEL;
+    return levelFromStored(null);
   }
 }
 
