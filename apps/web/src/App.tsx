@@ -3,10 +3,11 @@ import { MeResponse } from "@immersr/shared";
 import { Account } from "./Account.tsx";
 import { Home } from "./Home.tsx";
 import { Landing } from "./Landing.tsx";
+import { AppLoader } from "./Loading.tsx";
 import { Privacy } from "./Privacy.tsx";
 import { BottomNav, TopBar } from "./Nav.tsx";
 import { SessionPanel } from "./SessionPanel.tsx";
-import { THEMES, themeVars, useCurrentLanguage } from "./themes.ts";
+import { NEUTRAL_THEME, storedLanguage, THEMES, themeVars, useCurrentLanguage } from "./themes.ts";
 import { completeSignInIfRedirected, getIdToken, isSignedIn } from "./auth.ts";
 
 type State =
@@ -33,7 +34,9 @@ export function App() {
   // Signed-out visitors read the Privacy screen from Landing.
   const [visitorReadingPrivacy, setVisitorReadingPrivacy] = useState(false);
   const [language, setLanguage] = useCurrentLanguage();
-  const theme = THEMES[language];
+  // The app-start loader wears the last Target language's theme if this device knows it, else a neutral one.
+  const [languageKnown] = useState(() => storedLanguage() !== undefined);
+  const theme = state.kind === "loading" && !languageKnown ? NEUTRAL_THEME : THEMES[language];
   // Refresh the totals after a Session settles, without flashing the loading state.
   const refreshMe = () => void loadMe().then(setState, () => undefined);
 
@@ -49,7 +52,7 @@ export function App() {
       <main className="flex min-h-dvh w-full flex-col bg-bg">
         {state.kind === "home" && screen !== "session" && <TopBar current={screen === "privacy" ? "account" : screen} go={setScreen} streak={state.me.streak} />}
         <div aria-live="polite" className="flex grow flex-col">
-          {state.kind === "loading" && <p className="p-5">Loading…</p>}
+          {state.kind === "loading" && <AppLoader color={theme.body} />}
           {state.kind === "signed-out" &&
             (visitorReadingPrivacy ? (
               <Privacy backLabel="the start page" onBack={() => setVisitorReadingPrivacy(false)} />

@@ -24,13 +24,18 @@ interface LiveSessionProps {
   onResume(): void;
   onToggleListeningMode(): void;
   onEnd(): void;
+  /** The microphone and connection are still being set up: the controls are disabled except Cancel. */
+  connecting?: boolean;
+  onCancel?(): void;
 }
 
+const CONNECTING_LABEL = "Connecting to your Partner…";
+
 /** The Session screen: Blob in the country scene acting out the Partner state, then the Transcript. */
-export function LiveSession({ language, level, topic, secondsLeft, state, onToggleTranslation, onToggleMute, onPause, onResume, onToggleListeningMode, onEnd }: LiveSessionProps) {
+export function LiveSession({ language, level, topic, secondsLeft, state, onToggleTranslation, onToggleMute, onPause, onResume, onToggleListeningMode, onEnd, connecting = false, onCancel }: LiveSessionProps) {
   const theme = THEMES[language];
   const { partner, turns, draft, translations, muted, paused, listeningMode } = state;
-  const partnerLabel = paused ? "Paused" : PARTNER_LABEL[partner];
+  const partnerLabel = connecting ? CONNECTING_LABEL : paused ? "Paused" : PARTNER_LABEL[partner];
   // The Transcript follows the newest line, unless the Learner has scrolled up to reread something.
   const transcript = useRef<HTMLUListElement>(null);
   const following = useRef(true);
@@ -42,6 +47,7 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
     // One tree for both layouts, so resizing never remounts it. On a phone the parts stack. On a wide window it is a
     // grid: the scene on the left, the Transcript column on the right (gone in Listening mode), then the controls.
     <div
+      aria-busy={connecting}
       className={`flex grow flex-col desk:grid desk:min-h-0 desk:grid-rows-[minmax(0,1fr)_auto_auto] ${
         listeningMode ? "desk:grid-cols-1" : "desk:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
       }`}
@@ -54,21 +60,23 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
           <span className="pill min-w-0 truncate bg-white text-[#141414]">
             {theme.short} · {LEVEL_NAMES[level]} · {topic}
           </span>
-          <span
-            className="pill shrink-0 bg-you font-display text-base text-[#141414] desk:text-lg"
-            role="timer"
-            aria-label="Time left in this Session"
-          >
-            {formatCountdown(secondsLeft)}
-          </span>
+          {!connecting && (
+            <span
+              className="pill shrink-0 bg-you font-display text-base text-[#141414] desk:text-lg"
+              role="timer"
+              aria-label="Time left in this Session"
+            >
+              {formatCountdown(secondsLeft)}
+            </span>
+          )}
         </div>
         <div className="absolute inset-x-0 bottom-6 flex flex-col items-center gap-2">
           <Blob
             color={theme.body}
-            mood={paused ? "idle" : partner}
+            mood={connecting ? "thinking" : paused ? "idle" : partner}
             size={listeningMode ? 210 : 150}
             className={listeningMode ? "desk:h-auto desk:w-[300px]" : "desk:h-auto desk:w-[240px]"}
-            label={`Blob, the Partner, is ${partnerLabel.replace("…", "").toLowerCase()}`}
+            label={connecting ? "Blob is getting ready" : `Blob, the Partner, is ${partnerLabel.replace("…", "").toLowerCase()}`}
           />
           <span className="pill bg-body text-on-body" aria-live="polite">
             {partnerLabel}
@@ -90,6 +98,8 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
         </div>
         {listeningMode ? (
           <p className="m-auto px-4 py-6 text-center text-[15px] text-muted">Listening mode: no Transcript, just listen.</p>
+        ) : connecting ? (
+          <p className="m-auto px-4 py-6 text-center text-[15px] text-muted">Your conversation will appear here.</p>
         ) : (
           <ul
             ref={transcript}
@@ -148,6 +158,7 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
           className="icon-btn"
           aria-label={muted ? "Unmute your microphone" : "Mute your microphone"}
           aria-pressed={muted}
+          disabled={connecting}
           onClick={onToggleMute}
         >
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
@@ -156,20 +167,20 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
             {muted && <path d="M4 4l16 16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />}
           </svg>
         </button>
-        <button type="button" className="icon-btn" aria-label="Pause the Session" onClick={onPause}>
+        <button type="button" className="icon-btn" aria-label="Pause the Session" disabled={connecting} onClick={onPause}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             <path d="M8 5v14M16 5v14" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
           </svg>
         </button>
-        <button type="button" className="icon-btn" aria-label="Listening mode" aria-pressed={listeningMode} onClick={onToggleListeningMode}>
+        <button type="button" className="icon-btn" aria-label="Listening mode" aria-pressed={listeningMode} disabled={connecting} onClick={onToggleListeningMode}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             <path d="M4 14v-2a8 8 0 0 1 16 0v2" fill="none" stroke="currentColor" strokeWidth="2" />
             <rect x="3" y="14" width="5" height="7" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
             <rect x="16" y="14" width="5" height="7" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
           </svg>
         </button>
-        <button type="button" className="chunk-btn grow bg-accent text-white desk:ml-auto desk:min-w-[200px] desk:grow-0" onClick={onEnd}>
-          End
+        <button type="button" className="chunk-btn grow bg-accent text-white desk:ml-auto desk:min-w-[200px] desk:grow-0" onClick={connecting ? onCancel : onEnd}>
+          {connecting ? "Cancel" : "End"}
         </button>
       </div>
       {paused && (

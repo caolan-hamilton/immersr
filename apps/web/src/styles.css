@@ -221,7 +221,50 @@ body {
     transform: rotate(3deg);
   }
 }
+/* Loading states: bouncing dots and shimmering placeholders. */
+.loader-dot {
+  animation: loader-dot 1s ease-in-out infinite;
+}
+.loader-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.loader-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes loader-dot {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.skeleton {
+  background: linear-gradient(100deg, var(--track) 30%, color-mix(in srgb, var(--track) 55%, var(--card)) 50%, var(--track) 70%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+.skeleton--still {
+  animation: none;
+  background: var(--track);
+}
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 @media (prefers-reduced-motion: reduce) {
+  .loader-dot,
+  .skeleton {
+    animation: none !important;
+  }
+  .skeleton {
+    background: var(--track);
+  }
   .blob,
   .blob * {
     animation: none !important;
