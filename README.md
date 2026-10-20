@@ -45,7 +45,7 @@ The browser never holds an OpenAI key. It sends its WebRTC offer to the API, whi
 
 ## How it's built
 
-I built this with AI coding agents, using a spec-driven workflow. Each feature starts with a "grilling" session that settles its decisions, which become a spec, ADRs and [GLOSSARY.md](GLOSSARY.md). The spec is then split into tracer-bullet tickets, each a thin end-to-end slice with acceptance criteria. Claude, running in GitHub Actions, implements a ticket test-first and opens a pull request. A second Claude workflow reviews every PR against its ticket and hands "needs changes" findings back for a fix. I make the design decisions, review the PRs and decide what merges. Prod deploys from `main` through CI.
+I built this with AI coding agents, using a spec-driven workflow. Each feature starts with a "grilling" session that settles its decisions, which become a spec, ADRs and [GLOSSARY.md](GLOSSARY.md). The spec is then split into tracer-bullet tickets, each a thin end-to-end slice with acceptance criteria. Claude, running in GitHub Actions, implements a ticket with tests through the API seam (real route handlers against DynamoDB Local, with the outside world faked) and opens a pull request. CI runs the full suite on every pull request. A second Claude workflow reviews every PR against its ticket and hands "needs changes" findings back for a fix. I make the design decisions, review the PRs and decide what merges. Prod deploys from `main` through CI.
 
 **Stack:** TypeScript · React 19 · Vite · Tailwind CSS · Node.js Lambda · API Gateway · DynamoDB · Cognito · CloudFront · AWS CDK · OpenAI Realtime (WebRTC) · Amazon Translate · Vitest · GitHub Actions
 
