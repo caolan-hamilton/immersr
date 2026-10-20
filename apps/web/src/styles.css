@@ -11,6 +11,7 @@
   --track: #ece2cc;
   --you: #f2c230;
   --bad: #b91c1c;
+  --on-bad: #ffffff;
   /* Overridden per Target language by the screen shell. */
   --body: #1f8a4c;
   --accent: #d7263d;
@@ -27,6 +28,7 @@
     --shadow: rgba(237, 234, 227, 0.35);
     --track: #3a3f45;
     --bad: #f87171;
+    --on-bad: #14171a;
   }
 }
 
@@ -39,6 +41,7 @@
   --color-track: var(--track);
   --color-you: var(--you);
   --color-bad: var(--bad);
+  --color-on-bad: var(--on-bad);
   --color-body: var(--body);
   --color-accent: var(--accent);
   --color-on-body: var(--on-body);
