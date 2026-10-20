@@ -52,14 +52,30 @@ export const themeVars = (theme: Theme) =>
 const STORAGE_KEY = "immersr.language";
 const DEFAULT_LANGUAGE: Language = "pt-PT";
 
-function readLanguage(): Language {
+/** The Target language in a stored value, if it is one. */
+export const parseLanguage = (stored: string | null): Language | undefined => LANGUAGES.find((code) => code === stored);
+
+/** The Learner's last Target language on this device, if there is one. */
+export function storedLanguage(): Language | undefined {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return LANGUAGES.find((code) => code === stored) ?? DEFAULT_LANGUAGE;
+    return parseLanguage(localStorage.getItem(STORAGE_KEY));
   } catch {
-    return DEFAULT_LANGUAGE;
+    return undefined;
   }
 }
+
+const readLanguage = (): Language => storedLanguage() ?? DEFAULT_LANGUAGE;
+
+/** For the app-start loader on a device that has never chosen a Target language. */
+export const NEUTRAL_THEME: Theme = {
+  name: "Immersr",
+  short: "Immersr",
+  body: "#5B6470",
+  accent: "#3A3F45",
+  onBody: "#FFFFFF",
+  hello: "",
+  wellDone: "",
+};
 
 /** The current Target language, remembered on this device. */
 export function useCurrentLanguage(): [Language, (language: Language) => void] {

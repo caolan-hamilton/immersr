@@ -3,9 +3,10 @@ import { MeResponse } from "@immersr/shared";
 import { Account } from "./Account.tsx";
 import { Home } from "./Home.tsx";
 import { Landing } from "./Landing.tsx";
+import { AppLoader } from "./Loading.tsx";
 import { BottomNav, TopBar } from "./Nav.tsx";
 import { SessionPanel } from "./SessionPanel.tsx";
-import { THEMES, themeVars, useCurrentLanguage } from "./themes.ts";
+import { NEUTRAL_THEME, storedLanguage, THEMES, themeVars, useCurrentLanguage } from "./themes.ts";
 import { completeSignInIfRedirected, getIdToken, isSignedIn } from "./auth.ts";
 
 type State =
@@ -30,7 +31,9 @@ export function App() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [screen, setScreen] = useState<Screen>("home");
   const [language, setLanguage] = useCurrentLanguage();
-  const theme = THEMES[language];
+  // The app-start loader wears the last Target language's theme if this device knows it, else a neutral one.
+  const [languageKnown] = useState(() => storedLanguage() !== undefined);
+  const theme = state.kind === "loading" && !languageKnown ? NEUTRAL_THEME : THEMES[language];
   // Refresh the totals after a Session settles, without flashing the loading state.
   const refreshMe = () => void loadMe().then(setState, () => undefined);
 
@@ -46,7 +49,7 @@ export function App() {
       <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-bg sm:border-x-[3px] sm:border-line desk:max-w-none desk:border-x-0">
         {state.kind === "home" && screen !== "session" && <TopBar current={screen} go={setScreen} streak={state.me.streak} />}
         <div aria-live="polite" className="flex grow flex-col">
-          {state.kind === "loading" && <p className="p-5">Loading…</p>}
+          {state.kind === "loading" && <AppLoader color={theme.body} />}
           {state.kind === "signed-out" && <Landing language={language} />}
           {state.kind === "error" && (
             <p className="p-5">
