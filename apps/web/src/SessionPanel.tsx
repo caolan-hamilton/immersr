@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { type EndSessionResponse, type Language, type MeResponse } from "@immersr/shared";
 import { formatDuration, formatTimeOfDay } from "./format.ts";
 import { useLevel } from "./level.ts";
+import { readListeningMode, saveListeningMode } from "./listening-mode.ts";
 import { LiveSession } from "./LiveSession.tsx";
 import { initialSessionState, needsTranslation, sessionReducer } from "./session-state.ts";
 import { Setup } from "./Setup.tsx";
@@ -44,7 +45,11 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
   const [level, setLevel] = useLevel();
   const [topic, setTopic] = useState("");
   const [phase, setPhase] = useState<Phase>("setup");
-  const [session, dispatch] = useReducer(sessionReducer, initialSessionState);
+  const [session, dispatch] = useReducer(sessionReducer, undefined, () => ({
+    ...initialSessionState,
+    listeningMode: readListeningMode(),
+  }));
+  useEffect(() => saveListeningMode(session.listeningMode), [session.listeningMode]);
   const [error, setError] = useState<string>();
   const [micBlocked, setMicBlocked] = useState(false);
   const live = useRef<LiveConnection | undefined>(undefined);
@@ -214,6 +219,19 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
           secondsLeft={secondsLeft}
           state={session}
           onToggleTranslation={(index) => void toggleTranslation(index)}
+          onToggleMute={() => {
+            live.current?.setMuted(!session.muted);
+            dispatch({ kind: session.muted ? "unmute" : "mute" });
+          }}
+          onPause={() => {
+            live.current?.setPaused(true);
+            dispatch({ kind: "pause" });
+          }}
+          onResume={() => {
+            live.current?.setPaused(false);
+            dispatch({ kind: "resume" });
+          }}
+          onToggleListeningMode={() => dispatch({ kind: "toggle-listening-mode" })}
           onEnd={() => void finish()}
         />
         {error && (

@@ -68,10 +68,17 @@ body {
   .pick {
     @apply min-h-11 cursor-pointer rounded-[14px] border-[2.5px] border-line bg-card px-3 py-2.5 font-bold text-ink shadow-chunk-sm transition-[transform,box-shadow] duration-75;
   }
+  .icon-btn {
+    @apply flex size-[54px] shrink-0 cursor-pointer items-center justify-center rounded-2xl border-[2.5px] border-line bg-card text-ink shadow-chunk-sm transition-[transform,box-shadow] duration-75;
+  }
+  .icon-btn[aria-pressed="true"] {
+    @apply bg-you text-[#141414];
+  }
   .pill {
     @apply rounded-full border-[2.5px] border-line bg-card px-3 py-1 text-[13px] font-bold shadow-chunk-sm;
   }
   .chunk-btn:active,
+  .icon-btn:active,
   .pick:active {
     transform: translate(3px, 3px);
     box-shadow: 1px 1px 0 var(--shadow);
@@ -80,6 +87,7 @@ body {
     @apply cursor-not-allowed opacity-60;
   }
   .chunk-btn:focus-visible,
+  .icon-btn:focus-visible,
   .pick:focus-visible,
   .nav-item:focus-visible {
     @apply outline-[3px] outline-offset-2 outline-ink;
