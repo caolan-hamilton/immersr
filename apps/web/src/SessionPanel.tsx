@@ -1,16 +1,10 @@
 import { useEffect, useReducer, useRef, useState } from "react";
-import {
-  LANGUAGES,
-  LEVELS,
-  TOPIC_MAX_LENGTH,
-  type EndSessionResponse,
-  type Language,
-  type Level,
-  type MeResponse,
-} from "@immersr/shared";
-import { formatDuration, formatTimeOfDay, languageName } from "./format.ts";
+import { type EndSessionResponse, type Language, type MeResponse } from "@immersr/shared";
+import { formatDuration, formatTimeOfDay } from "./format.ts";
+import { useLevel } from "./level.ts";
 import { LiveSession } from "./LiveSession.tsx";
 import { initialSessionState, needsTranslation, sessionReducer } from "./session-state.ts";
+import { Setup } from "./Setup.tsx";
 import { clearPendingEnd, deliverPendingEnd, loadPendingEnd, savePendingEnd, type PendingEnd } from "./pending-end.ts";
 import {
   MicrophoneBlockedError,
@@ -35,11 +29,10 @@ interface SessionPanelProps {
   language: Language;
   onLanguageChange(language: Language): void;
   onSettled(): void;
-  /** Tells the screen shell whether a Session is connecting, live or being ended, so it can stay put. */
-  onBusyChange(busy: boolean): void;
+  onBack(): void;
 }
 
-export function SessionPanel({ allowance, language, onLanguageChange, onSettled, onBusyChange }: SessionPanelProps) {
+export function SessionPanel({ allowance, language, onLanguageChange, onSettled, onBack }: SessionPanelProps) {
   const remaining = Math.max(0, allowance.limitSeconds - allowance.usedSeconds);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [summary, setSummary] = useState<EndSessionResponse>();
@@ -48,7 +41,7 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
   // Also saved on the device, so it survives a closed tab or a reload.
   const unsettled = useRef<PendingEnd | undefined>(loadPendingEnd());
   const retrying = useRef(false);
-  const [level, setLevel] = useState<Level>("A1");
+  const [level, setLevel] = useLevel();
   const [topic, setTopic] = useState("");
   const [phase, setPhase] = useState<Phase>("setup");
   const [session, dispatch] = useReducer(sessionReducer, initialSessionState);
@@ -98,8 +91,6 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
       window.removeEventListener("pageshow", dropIfStillLive);
     };
   }, []);
-
-  useEffect(() => onBusyChange(phase !== "setup"), [phase]);
 
   // Closes the connection, then has the server hang up and settle. Safe to call twice (End, countdown, drop).
   const finish = async () => {
@@ -234,75 +225,45 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
     );
   }
 
+  if (phase === "setup") {
+    return (
+      <div className="flex grow flex-col">
+        {summary && (
+          <p role="status" className="session-panel m-5 mb-0">
+            Session over. <b>{formatDuration(summary.immersionSeconds)}</b> added to your Immersion time (
+            {summary.immersionSeconds}s of the Partner speaking, {formatDuration(summary.chargedSeconds)} of your
+            allowance used).
+          </p>
+        )}
+        <Setup
+          language={language}
+          onLanguageChange={onLanguageChange}
+          level={level}
+          onLevelChange={setLevel}
+          topic={topic}
+          onTopicChange={setTopic}
+          remainingSeconds={remaining}
+          error={error}
+          micBlocked={micBlocked}
+          onBack={onBack}
+          onStart={() => void start()}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="session-panel p-5">
+    <div className="flex grow flex-col">
+      <header className="flex items-center justify-between border-b-[3px] border-line bg-body px-5 py-[18px] text-on-body">
+        <span className="font-display text-[26px] font-black">Immersr</span>
+      </header>
+      <div className="session-panel p-5">
       <h2>Talk to the Partner</h2>
-      {phase === "setup" && summary && (
-        <p role="status">
-          Session over. <b>{formatDuration(summary.immersionSeconds)}</b> added to your Immersion time (
-          {summary.immersionSeconds}s of the Partner speaking, {formatDuration(summary.chargedSeconds)} of your allowance
-          used).
-        </p>
-      )}
-      {phase === "setup" && (
-        <p className="muted">
-          {formatDuration(remaining)} of your daily allowance left. It resets at {formatTimeOfDay(allowance.resetsAt)}.
-        </p>
-      )}
-      {phase === "setup" && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void start();
-          }}
-        >
-          <p>
-            <label>
-              Language{" "}
-              <select value={language} onChange={(e) => onLanguageChange(e.target.value as Language)}>
-                {LANGUAGES.map((code) => (
-                  <option key={code} value={code}>
-                    {languageName(code)} ({code})
-                  </option>
-                ))}
-              </select>
-            </label>{" "}
-            <label>
-              Level{" "}
-              <select value={level} onChange={(e) => setLevel(e.target.value as Level)}>
-                {LEVELS.map((l) => (
-                  <option key={l}>{l}</option>
-                ))}
-              </select>
-            </label>
-          </p>
-          <p>
-            <label>
-              Topic{" "}
-              <input
-                value={topic}
-                maxLength={TOPIC_MAX_LENGTH}
-                placeholder="e.g. my last holiday"
-                onChange={(e) => setTopic(e.target.value)}
-              />
-            </label>{" "}
-            <button type="submit" disabled={!topic.trim()}>
-              Start
-            </button>
-          </p>
-        </form>
-      )}
       {phase === "connecting" && <p>Connecting…</p>}
       {phase === "ending" && <p>Ending the Session…</p>}
       {phase === "end-failed" && (
         <p>
           <button onClick={() => void settleUnsettled()}>Retry ending the Session</button>
-        </p>
-      )}
-      {micBlocked && (
-        <p role="alert">
-          <span className="dot bad" /> Immersr can't use your microphone. Click the lock or camera icon in your browser's
-          address bar, set Microphone to Allow, then reload this page and press Start again.
         </p>
       )}
       {error && (
@@ -320,6 +281,7 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
           ))}
         </ul>
       )}
+      </div>
     </div>
   );
 }

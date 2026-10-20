@@ -28,7 +28,6 @@ async function loadMe(): Promise<State> {
 export function App() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [screen, setScreen] = useState<Screen>("home");
-  const [sessionBusy, setSessionBusy] = useState(false);
   const [language, setLanguage] = useCurrentLanguage();
   const theme = THEMES[language];
   // Refresh the totals after a Session settles, without flashing the loading state.
@@ -62,13 +61,13 @@ export function App() {
           )}
           {/* Always mounted (hidden off its screen) so a Session left unsettled by a closed tab is settled on load. */}
           {state.kind === "home" && (
-            <SessionScreen visible={screen === "session"} busy={sessionBusy} onBack={() => setScreen("home")}>
+            <SessionScreen visible={screen === "session"}>
               <SessionPanel
+                onBack={() => setScreen("home")}
                 allowance={state.me.allowance}
                 language={language}
                 onLanguageChange={setLanguage}
                 onSettled={refreshMe}
-                onBusyChange={setSessionBusy}
               />
             </SessionScreen>
           )}
@@ -80,32 +79,9 @@ export function App() {
   );
 }
 
-// Hosts the existing Session flow. Leaving is blocked while a Session is connecting, live or being ended.
-function SessionScreen({
-  visible,
-  busy,
-  onBack,
-  children,
-}: {
-  visible: boolean;
-  busy: boolean;
-  onBack(): void;
-  children: ReactNode;
-}) {
-  return (
-    <div className={visible ? "flex grow flex-col" : "hidden"}>
-      {/* While a Session is connecting, live or ending, the screen is the Session's own. */}
-      {!busy && (
-        <header className="flex items-center justify-between border-b-[3px] border-line bg-body px-5 py-3 text-on-body">
-          <span className="font-display text-[26px] font-black">Immersr</span>
-          <button type="button" className="pick bg-card" style={{ color: "var(--ink)" }} onClick={onBack}>
-            Back to Home
-          </button>
-        </header>
-      )}
-      {children}
-    </div>
-  );
+// Hosts Setup and the Session flow. Hidden, not unmounted, off its screen.
+function SessionScreen({ visible, children }: { visible: boolean; children: ReactNode }) {
+  return <div className={visible ? "flex grow flex-col" : "hidden"}>{children}</div>;
 }
 
 function Nav({ current, go }: { current: "home" | "account"; go(screen: "home" | "account"): void }) {
