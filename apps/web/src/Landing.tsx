@@ -11,7 +11,7 @@ const STEPS = [
 ];
 
 // The Landing screen for signed-out visitors. On a wide window it splits: the pitch on the left, the scene on the right.
-export function Landing({ language }: { language: Language }) {
+export function Landing({ language, onPrivacy }: { language: Language; onPrivacy(): void }) {
   const theme = THEMES[language];
   return (
     <div className="flex grow flex-col desk:grid desk:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -23,9 +23,9 @@ export function Landing({ language }: { language: Language }) {
           <Blob color={theme.body} mood="happy" size={170} label="Blob waving hello" className="desk:h-auto desk:w-[260px]" />
         </div>
       </div>
-      <div className="flex grow flex-col gap-4 px-[22px] pb-7 pt-[22px] desk:order-1 desk:justify-center desk:gap-6 desk:px-16 desk:py-14">
-        <h1 className="font-display text-[40px] font-black desk:text-7xl">Immersr</h1>
-        <p className="text-lg leading-snug desk:max-w-[520px] desk:text-2xl">
+      <div className="flex grow flex-col gap-4 px-[22px] pb-7 pt-[22px] desk:order-1 desk:justify-center desk:gap-6 desk:px-[clamp(32px,5vw,64px)] desk:py-14">
+        <h1 className="font-display text-[40px] font-black desk:text-[clamp(52px,6.5vw,72px)]">Immersr</h1>
+        <p className="text-lg leading-snug desk:max-w-[520px] desk:text-[clamp(19px,2.2vw,24px)]">
           Real conversation in the language you're acquiring. <b>They speak it. You answer in English.</b>
         </p>
         <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-[15px] desk:gap-2.5 desk:text-lg">
@@ -36,7 +36,7 @@ export function Landing({ language }: { language: Language }) {
         <div className="grow desk:hidden" />
         <button
           type="button"
-          className="chunk-btn flex items-center justify-center gap-2.5 bg-white text-[#141414] desk:mt-2 desk:self-start desk:px-8"
+          className="chunk-btn flex items-center whitespace-nowrap justify-center gap-2.5 bg-white text-[#141414] desk:mt-2 desk:self-start desk:px-8"
           onClick={() => void signIn()}
         >
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
@@ -46,6 +46,13 @@ export function Landing({ language }: { language: Language }) {
             <path d="M12 6c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.4L6.4 10C7.2 7.8 9.4 6 12 6z" fill="#EA4335" />
           </svg>
           Sign in with Google
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-11 cursor-pointer items-center justify-center p-0 font-bold text-ink underline desk:justify-start"
+          onClick={onPrivacy}
+        >
+          Privacy: what Immersr stores
         </button>
       </div>
     </div>

@@ -46,7 +46,7 @@
   --color-accent: var(--accent);
   --color-on-body: var(--on-body);
   /* The desktop layout starts here (`desk:` variants). Below it, every screen keeps its phone layout. */
-  --breakpoint-desk: 900px;
+  --breakpoint-desk: 768px;
   --font-display: Fraunces, Georgia, serif;
   --font-sans: "DM Sans", system-ui, sans-serif;
   --shadow-chunk: 4px 4px 0 var(--shadow);

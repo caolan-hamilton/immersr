@@ -2,7 +2,7 @@ import { useState } from "react";
 import { getEmail, getIdToken, signOut } from "./auth.ts";
 
 // The Account screen: sign out, or erase everything (GDPR) after an explicit confirmation.
-export function Account() {
+export function Account({ onPrivacy }: { onPrivacy(): void }) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string>();
@@ -30,10 +30,13 @@ export function Account() {
         <div className="font-bold">Signed in with Google</div>
         {email && <div className="muted break-all">{email}</div>}
       </div>
-      {/* The privacy content itself is #12; this anchor is where it will live. */}
-      <a href="#privacy" className="inline-flex min-h-11 items-center font-bold text-ink underline">
+      <button
+        type="button"
+        className="inline-flex min-h-11 cursor-pointer items-center self-start p-0 font-bold text-ink underline"
+        onClick={onPrivacy}
+      >
         Privacy: what Immersr stores
-      </a>
+      </button>
       <button type="button" className="chunk-btn bg-card text-ink desk:self-start desk:px-9" onClick={() => void signOut()}>
         Sign out
       </button>

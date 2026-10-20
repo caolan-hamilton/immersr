@@ -4,6 +4,7 @@ import { Account } from "./Account.tsx";
 import { Home } from "./Home.tsx";
 import { Landing } from "./Landing.tsx";
 import { AppLoader } from "./Loading.tsx";
+import { Privacy } from "./Privacy.tsx";
 import { BottomNav, TopBar } from "./Nav.tsx";
 import { SessionPanel } from "./SessionPanel.tsx";
 import { NEUTRAL_THEME, storedLanguage, THEMES, themeVars, useCurrentLanguage } from "./themes.ts";
@@ -15,7 +16,7 @@ type State =
   | { kind: "home"; me: MeResponse }
   | { kind: "error"; message: string };
 
-type Screen = "home" | "session" | "account";
+type Screen = "home" | "session" | "account" | "privacy";
 
 async function loadMe(): Promise<State> {
   const token = await getIdToken();
@@ -30,6 +31,8 @@ async function loadMe(): Promise<State> {
 export function App() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [screen, setScreen] = useState<Screen>("home");
+  // Signed-out visitors read the Privacy screen from Landing.
+  const [visitorReadingPrivacy, setVisitorReadingPrivacy] = useState(false);
   const [language, setLanguage] = useCurrentLanguage();
   // The app-start loader wears the last Target language's theme if this device knows it, else a neutral one.
   const [languageKnown] = useState(() => storedLanguage() !== undefined);
@@ -46,11 +49,16 @@ export function App() {
 
   return (
     <div style={themeVars(theme)} className="min-h-dvh bg-bg font-sans text-ink">
-      <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-bg sm:border-x-[3px] sm:border-line desk:max-w-none desk:border-x-0">
-        {state.kind === "home" && screen !== "session" && <TopBar current={screen} go={setScreen} streak={state.me.streak} />}
+      <main className="flex min-h-dvh w-full flex-col bg-bg">
+        {state.kind === "home" && screen !== "session" && <TopBar current={screen === "privacy" ? "account" : screen} go={setScreen} streak={state.me.streak} />}
         <div aria-live="polite" className="flex grow flex-col">
           {state.kind === "loading" && <AppLoader color={theme.body} />}
-          {state.kind === "signed-out" && <Landing language={language} />}
+          {state.kind === "signed-out" &&
+            (visitorReadingPrivacy ? (
+              <Privacy backLabel="the start page" onBack={() => setVisitorReadingPrivacy(false)} />
+            ) : (
+              <Landing language={language} onPrivacy={() => setVisitorReadingPrivacy(true)} />
+            ))}
           {state.kind === "error" && (
             <p className="p-5">
               <span className="dot bad" /> Something went wrong: {state.message}
@@ -79,9 +87,10 @@ export function App() {
               />
             </SessionScreen>
           )}
-          {state.kind === "home" && screen === "account" && <Account />}
+          {state.kind === "home" && screen === "account" && <Account onPrivacy={() => setScreen("privacy")} />}
+          {state.kind === "home" && screen === "privacy" && <Privacy backLabel="Account" onBack={() => setScreen("account")} />}
         </div>
-        {state.kind === "home" && screen !== "session" && <BottomNav current={screen} go={setScreen} />}
+        {state.kind === "home" && screen !== "session" && <BottomNav current={screen === "privacy" ? "account" : screen} go={setScreen} />}
       </main>
     </div>
   );
