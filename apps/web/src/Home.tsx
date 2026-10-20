@@ -23,14 +23,14 @@ export function Home({ me, language, onLanguageChange, onStartSession }: HomePro
 
   return (
     <div className="flex grow flex-col">
-      <header className="flex items-center justify-between border-b-[3px] border-line bg-body px-5 py-[18px] text-on-body desk:hidden">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b-[3px] border-line bg-body px-5 py-3 text-on-body desk:hidden">
         <span className="font-display text-[26px] font-black">Immersr</span>
         <StreakPill streak={me.streak} />
       </header>
       {/* On a wide window the hero card and a column of stats sit side by side, capped in width. */}
-      <div className="flex grow flex-col gap-3.5 px-5 pt-[18px] desk:mx-auto desk:grid desk:w-full desk:max-w-[1120px] desk:grow-0 desk:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] desk:items-start desk:gap-7 desk:px-8 desk:pb-12 desk:pt-8">
-        <div className="chunk flex items-center gap-3 px-3.5 py-3 desk:hidden">
-          <Blob color={theme.body} mood="happy" size={92} />
+      <div className="flex grow flex-col gap-3 px-5 pt-3.5 desk:mx-auto desk:grid desk:w-full desk:max-w-[1120px] desk:grow-0 desk:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] desk:items-start desk:gap-7 desk:px-8 desk:pb-12 desk:pt-8">
+        <div className="chunk flex items-center gap-3 px-3.5 py-2.5 desk:hidden">
+          <Blob color={theme.body} mood="happy" size={76} />
           <div>
             <h2 className="font-display text-[26px] font-black">{theme.hello}</h2>
             <p className="text-[15px]">Ready for today's chat in {theme.short}?</p>
@@ -119,7 +119,7 @@ export function Home({ me, language, onLanguageChange, onStartSession }: HomePro
         </div>
         </div>
         <div className="grow desk:hidden" />
-        <button type="button" className="chunk-btn mb-4 bg-accent text-white desk:hidden" onClick={onStartSession}>
+        <button type="button" className="chunk-btn mb-3 bg-accent text-white desk:hidden" onClick={onStartSession}>
           Start a Session
         </button>
       </div>

@@ -81,7 +81,7 @@ export function Setup(props: SetupProps) {
                     <button
                       key={code}
                       type="button"
-                      className="pick"
+                      className="pick min-w-0 px-1.5 text-[clamp(13px,3.8vw,16px)] desk:text-base"
                       aria-pressed={chosen}
                       onClick={() => props.onLanguageChange(code)}
                       style={chosen ? { background: tile.body, color: tile.onBody } : undefined}
