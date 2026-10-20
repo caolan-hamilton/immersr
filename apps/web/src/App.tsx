@@ -4,6 +4,8 @@ import { Account } from "./Account.tsx";
 import { Home } from "./Home.tsx";
 import { Landing } from "./Landing.tsx";
 import { AppLoader } from "./Loading.tsx";
+import { Offline } from "./Offline.tsx";
+import { useOnline } from "./online.ts";
 import { Privacy } from "./Privacy.tsx";
 import { BottomNav, TopBar } from "./Nav.tsx";
 import { SessionPanel } from "./SessionPanel.tsx";
@@ -47,9 +49,15 @@ export function App() {
       .catch((err: unknown) => setState({ kind: "error", message: err instanceof Error ? err.message : String(err) }));
   }, []);
 
+  // A live Session keeps its own screen even if the connection blips; everywhere else offline gets the friendly screen.
+  const online = useOnline();
+  const offlineScreen = !online && !(state.kind === "home" && screen === "session");
+
   return (
     <div style={themeVars(theme)} className="min-h-dvh bg-bg font-sans text-ink">
-      <main className="flex min-h-dvh w-full flex-col bg-bg">
+      {/* Offline hides the app rather than replacing it, so SessionPanel keeps its in-memory Session state. */}
+      {offlineScreen && <Offline color={theme.body} />}
+      <main className={offlineScreen ? "hidden" : "flex min-h-dvh w-full flex-col bg-bg"}>
         {state.kind === "home" && screen !== "session" && <TopBar current={screen === "privacy" ? "account" : screen} go={setScreen} streak={state.me.streak} />}
         <div aria-live="polite" className="flex grow flex-col">
           {state.kind === "loading" && <AppLoader color={theme.body} />}
