@@ -64,8 +64,12 @@ jobs:
             - Only comment on real problems, with a concrete failure scenario. Skip style nits, formatting and
               personal preferences.
             - Put specific issues as inline comments on the exact lines. Finish with one top-level summary:
-              a verdict (ready to merge / needs changes), each acceptance criterion as met or not met,
-              and anything you couldn't verify.
+              a verdict, each acceptance criterion as met or not met, and anything you couldn't verify.
+            - The verdict is a line on its own that is exactly `**Verdict: ready to merge**` or
+              `**Verdict: needs changes**` (the Claude fix workflow reads this line). Say "needs changes" only for
+              problems someone can fix in code. Things you can't verify here (how a screen looks, live audio,
+              AWS behaviour) go under "couldn't verify" and are not by themselves a reason for "needs changes":
+              the owner checks those by eye.
             - Don't push commits or approve the PR. Only comment.
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*),Read,Glob,Grep"
