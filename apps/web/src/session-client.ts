@@ -170,6 +170,9 @@ export async function startSession(
       const refusal = SessionRefusal.safeParse(await response.json().catch(() => undefined));
       throw new SessionRefusedError(refusal.success ? refusal.data.reason : "global-cap");
     }
+    if (response.status === 403) {
+      throw new SessionStartError("Sessions aren't open to everyone yet. Ask the owner to give you access.");
+    }
     if (response.status === 422) {
       throw new SessionStartError("That Topic can't be used. Please choose another Topic. Your other choices are kept.");
     }

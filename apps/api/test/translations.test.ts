@@ -23,7 +23,7 @@ describe("POST /api/translations", () => {
   /** Starts a Session for `sub`; each test uses its own sub so counters don't mix. */
   async function start(sub: string, fake = fakeOutsideWorld()) {
     const deps = testDeps(table.tableName, fake);
-    const response = await createSession(deps)(httpEvent({ method: "POST", path: "/api/sessions", body: valid, sub }));
+    const response = await createSession(deps)(httpEvent({ method: "POST", path: "/api/sessions", body: valid, groups: ["admins"], sub }));
     expect(response.statusCode).toBe(201);
     const { sessionId } = parseBody(response);
     const ask = (body: unknown, as = sub) =>

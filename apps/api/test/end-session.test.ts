@@ -26,7 +26,7 @@ describe("POST /api/sessions/{id}/end", () => {
   async function start(sub: string, fake = fakeOutsideWorld()) {
     const deps = testDeps(table.tableName, fake);
     const response = await createSession(deps)(
-      httpEvent({ method: "POST", path: "/api/sessions", body: valid, sub }),
+      httpEvent({ method: "POST", path: "/api/sessions", body: valid, groups: ["admins"], sub }),
     );
     expect(response.statusCode).toBe(201);
     const { sessionId } = parseBody(response);
