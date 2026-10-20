@@ -19,7 +19,7 @@ export const THEMES: Record<Language, Theme> = {
   "pt-PT": {
     name: "European Portuguese",
     short: "Portuguese",
-    body: "#1F8A4C",
+    body: "#1A7A42",
     accent: "#D7263D",
     onBody: "#FFFFFF",
     hello: "Olá!",

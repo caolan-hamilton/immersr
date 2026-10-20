@@ -60,8 +60,9 @@ export function App() {
               onStartSession={() => setScreen("session")}
             />
           )}
-          {state.kind === "home" && screen === "session" && (
-            <SessionScreen busy={sessionBusy} onBack={() => setScreen("home")}>
+          {/* Always mounted (hidden off its screen) so a Session left unsettled by a closed tab is settled on load. */}
+          {state.kind === "home" && (
+            <SessionScreen visible={screen === "session"} busy={sessionBusy} onBack={() => setScreen("home")}>
               <SessionPanel
                 allowance={state.me.allowance}
                 language={language}
@@ -104,9 +105,19 @@ function SignedOut({ language }: { language: keyof typeof THEMES }) {
 }
 
 // Hosts the existing Session flow. Leaving is blocked while a Session is connecting, live or being ended.
-function SessionScreen({ busy, onBack, children }: { busy: boolean; onBack(): void; children: ReactNode }) {
+function SessionScreen({
+  visible,
+  busy,
+  onBack,
+  children,
+}: {
+  visible: boolean;
+  busy: boolean;
+  onBack(): void;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex grow flex-col">
+    <div className={visible ? "flex grow flex-col" : "hidden"}>
       <header className="flex items-center justify-between border-b-[3px] border-line bg-body px-5 py-3 text-on-body">
         <span className="font-display text-[26px] font-black">Immersr</span>
         <button
