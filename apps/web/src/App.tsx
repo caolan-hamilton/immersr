@@ -65,6 +65,7 @@ export function App() {
               <SessionPanel
                 onBack={() => setScreen("home")}
                 allowance={state.me.allowance}
+                immersion={state.me.immersion}
                 language={language}
                 onLanguageChange={setLanguage}
                 onSettled={refreshMe}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MILESTONES, nextMilestone } from "./milestones.ts";
+import { crossedMilestone, MILESTONES, nextMilestone } from "./milestones.ts";
 
 const hours = (h: number) => h * 3600;
 
@@ -46,5 +46,23 @@ describe("nextMilestone", () => {
 
   it("treats negative time as none", () => {
     expect(nextMilestone(-10).next?.hours).toBe(50);
+  });
+});
+
+describe("crossedMilestone", () => {
+  // [before, after, hours of the Milestone crossed (undefined for none)]
+  const table: [number, number, number | undefined][] = [
+    [0, 0, undefined],
+    [0, hours(50) - 1, undefined],
+    [hours(50) - 1, hours(50), 50],
+    [hours(50), hours(50) + 600, undefined],
+    [hours(49), hours(51), 50],
+    [hours(149), hours(150), 150],
+    [hours(1499), hours(1500), 1500],
+    [hours(1500), hours(1501), undefined],
+    [hours(10), hours(200), 150],
+  ];
+  it.each(table)("from %i s to %i s crosses %s h", (before, after, expected) => {
+    expect(crossedMilestone(before, after)?.hours).toBe(expected);
   });
 });

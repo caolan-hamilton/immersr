@@ -3,7 +3,7 @@ import { EndSessionRequest, type EndSessionResponse } from "@immersr/shared";
 import type { Deps } from "../lib/deps.ts";
 import { json } from "../lib/http.ts";
 import { callerOf } from "../lib/learner.ts";
-import { getSession, settle } from "../lib/metering.ts";
+import { getSession, settle, storedSettlement } from "../lib/metering.ts";
 
 // POST /api/sessions/{id}/end: hang up first, then settle once on the server's clock (ADR 0004, ADR 0006).
 export const endSession =
@@ -26,10 +26,7 @@ export const endSession =
     if (!session) return json(404, { error: "Session not found." });
 
     if (session.status !== "active") {
-      const stored: EndSessionResponse = {
-        chargedSeconds: session.chargedSeconds ?? 0,
-        immersionSeconds: session.immersionSeconds ?? 0,
-      };
+      const stored: EndSessionResponse = storedSettlement(session);
       return json(200, stored);
     }
 
