@@ -102,6 +102,22 @@ export async function getIdToken(): Promise<string | undefined> {
   }
 }
 
+/** The signed-in Learner's email, read from the ID token's claims (display only; the API verifies the token itself). */
+export function getEmail(): string | undefined {
+  const idToken = readTokens()?.idToken;
+  if (!idToken) return undefined;
+  try {
+    const base64 = idToken.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payload), (c) => c.charCodeAt(0)))) as {
+      email?: unknown;
+    };
+    return typeof claims.email === "string" ? claims.email : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function signOut(): Promise<void> {
   const config = await loadConfig();
   localStorage.removeItem(STORAGE_KEY);

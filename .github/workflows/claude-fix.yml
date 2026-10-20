@@ -1,0 +1,141 @@
+name: Claude fix
+
+# When the Claude PR review finishes with "Verdict: needs changes" on a PR from one of @claude's own
+# branches (claude/*), hand the review back to Claude to fix and push. The push re-runs CI and the review,
+# so this repeats until the verdict is "ready to merge" or MAX_ROUNDS fix rounds have run; then the PR
+# is labelled needs-human. A human still merges.
+#
+# workflow_run always runs this file as it is on main, with main's secrets, so only same-repo
+# claude/* branches are handled, never forks.
+
+on:
+  workflow_run:
+    workflows: ["Claude PR review"]
+    types: [completed]
+
+concurrency:
+  group: claude-fix-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+env:
+  MAX_ROUNDS: 2
+
+jobs:
+  decide:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'claude/')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    outputs:
+      pr: ${{ steps.check.outputs.pr }}
+      round: ${{ steps.check.outputs.round }}
+      fix: ${{ steps.check.outputs.fix }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REVIEW_STARTED: ${{ github.event.workflow_run.run_started_at }}
+        run: |
+          set -euo pipefail
+          echo "fix=false" >> "$GITHUB_OUTPUT"
+
+          pr=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')
+          if [ -z "$pr" ]; then echo "No open PR for $BRANCH."; exit 0; fi
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+
+          # A newer push has its own review coming: don't act on a stale one.
+          head=$(gh pr view "$pr" --json headRefOid -q .headRefOid)
+          if [ "$head" != "$HEAD_SHA" ]; then echo "PR #$pr has moved on from $HEAD_SHA."; exit 0; fi
+
+          # The review's summary is a claude[bot] comment with a Verdict line, written during this review run.
+          verdict=$(gh api "repos/$GH_REPO/issues/$pr/comments" --paginate \
+            --jq ".[] | select(.user.login == \"claude[bot]\" and .updated_at >= \"$REVIEW_STARTED\" and (.body | test(\"Verdict:\"; \"i\"))) | .body" \
+            | tail -c 20000)
+          if ! grep -qiE 'Verdict:[* ]*needs changes' <<< "$verdict"; then
+            echo "PR #$pr: no 'needs changes' verdict from this review."; exit 0
+          fi
+
+          done_rounds=$(gh api "repos/$GH_REPO/issues/$pr/comments" --paginate \
+            --jq '.[] | select(.body | contains("<!-- claude-fix-round -->")) | .id' | wc -l | tr -d ' ')
+          if [ "$done_rounds" -ge "$MAX_ROUNDS" ]; then
+            gh label create needs-human --color B60205 --description "Automation gave up; a human should look" 2>/dev/null || true
+            gh pr edit "$pr" --add-label needs-human
+            gh pr comment "$pr" --body "The review still says needs changes after $MAX_ROUNDS automatic fix rounds, so this PR needs a human. Labelled \`needs-human\`."
+            exit 0
+          fi
+
+          round=$((done_rounds + 1))
+          gh pr comment "$pr" --body "<!-- claude-fix-round -->
+          Fix round $round of $MAX_ROUNDS: handing the review findings back to Claude."
+          echo "round=$round" >> "$GITHUB_OUTPUT"
+          echo "fix=true" >> "$GITHUB_OUTPUT"
+
+  fix:
+    needs: decide
+    if: needs.decide.outputs.fix == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read # lets Claude read CI results on the PR
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports: ["8000:8000"]
+    env:
+      DYNAMODB_ENDPOINT: http://localhost:8000
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # With a prompt, the action runs in agent mode and pushes with the Claude app token,
+      # so the fix commits trigger CI and a fresh review.
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # The review that triggered this ran for a push by our own implementer (`claude`, or
+          # `github-actions` for its follow-up pushes). Never '*'.
+          allowed_bots: claude,github-actions
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ needs.decide.outputs.pr }}
+            BRANCH: ${{ github.event.workflow_run.head_branch }} (already checked out)
+            FIX ROUND: ${{ needs.decide.outputs.round }} of ${{ env.MAX_ROUNDS }}
+
+            The Claude PR review on this pull request says "Verdict: needs changes". Address it.
+
+            1. Read the PR (`gh pr view`), the issue it closes and its parent spec (`gh issue view`), the latest
+               claude[bot] review summary (`gh pr view --comments`), the inline review comments
+               (`gh api repos/${{ github.repository }}/pulls/${{ needs.decide.outputs.pr }}/comments`),
+               and any failing CI run (`gh run list --branch <branch>`, `gh run view <id> --log-failed`).
+            2. Fix every finding that is a real problem. If you disagree with a finding, don't change code for it;
+               explain why in your reply.
+            3. Run pnpm typecheck, pnpm test and pnpm synth, and fix anything that fails.
+            4. Commit and push to this branch (never to main, never force-push).
+            5. Update the acceptance-criteria checklist in the PR body if anything changed, and post one PR comment
+               listing each finding as fixed or not fixed (with the reason).
+          claude_args: |
+            --allowedTools "Bash(pnpm:*),Bash(git:*),Bash(gh issue view:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr edit:*),Bash(gh api repos/${{ github.repository }}/pulls/*),Bash(gh run view:*),Bash(gh run list:*),Read,Edit,Write,Glob,Grep"
+            --append-system-prompt "You are working on Immersr, a language-immersion web app.
+            Read CLAUDE.md, GLOSSARY.md and the ADRs in docs/adr/ before changing code, and use glossary terms in names.
+            Tests go through the API seam: route handlers + DynamoDB Local + faked outside world (apps/api/test/harness.ts).
+            Never deploy, never change infra/lib/ci-stack.ts or the GitHub workflows, and never add secrets to code."
