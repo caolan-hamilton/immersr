@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { type EndSessionResponse, type Language, type MeResponse } from "@immersr/shared";
-import { formatCountdown, formatDuration, formatTimeOfDay } from "./format.ts";
+import { formatDuration, formatTimeOfDay } from "./format.ts";
 import { useLevel } from "./level.ts";
+import { LiveSession } from "./LiveSession.tsx";
+import { initialSessionState, needsTranslation, sessionReducer } from "./session-state.ts";
 import { Setup } from "./Setup.tsx";
 import { clearPendingEnd, deliverPendingEnd, loadPendingEnd, savePendingEnd, type PendingEnd } from "./pending-end.ts";
 import {
@@ -10,17 +12,8 @@ import {
   startSession,
   TranslationLimitError,
   translateTurn,
-  type LiveSession,
-  type TurnSpeaker,
+  type LiveSession as LiveConnection,
 } from "./session-client.ts";
-
-interface Turn {
-  speaker: TurnSpeaker;
-  text: string;
-}
-
-/** A Partner Turn's Turn translation, kept per Turn so tapping again never asks (or counts) twice. */
-type TurnTranslation = { state: "loading" } | { state: "done"; text: string } | { state: "failed"; message: string };
 
 const TRANSLATION_LIMIT_MESSAGE = "You've reached today's translation limit. It resets at midnight UTC.";
 
@@ -51,25 +44,29 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
   const [level, setLevel] = useLevel();
   const [topic, setTopic] = useState("");
   const [phase, setPhase] = useState<Phase>("setup");
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [draft, setDraft] = useState("");
+  const [session, dispatch] = useReducer(sessionReducer, initialSessionState);
   const [error, setError] = useState<string>();
   const [micBlocked, setMicBlocked] = useState(false);
-  const live = useRef<LiveSession | undefined>(undefined);
-  const [translations, setTranslations] = useState<Record<number, TurnTranslation>>({});
+  const live = useRef<LiveConnection | undefined>(undefined);
   // The live Session that Turn translations are asked for.
   const transcriptSession = useRef<string | undefined>(undefined);
 
-  const showTranslation = async (index: number, text: string) => {
+  const toggleTranslation = async (index: number) => {
     const sessionId = transcriptSession.current;
-    if (!sessionId || translations[index]?.state === "loading" || translations[index]?.state === "done") return;
-    setTranslations((previous) => ({ ...previous, [index]: { state: "loading" } }));
+    const text = session.turns[index]?.text;
+    if (!sessionId || text === undefined) return;
+    const asking = needsTranslation(session, index);
+    dispatch({ kind: "toggle-translation", index });
+    if (!asking) return;
+    // A late answer from an earlier Session must not land on a Turn of the current one.
+    const stillThisSession = () => transcriptSession.current === sessionId;
     try {
-      const translation = await translateTurn(sessionId, text);
-      setTranslations((previous) => ({ ...previous, [index]: { state: "done", text: translation } }));
+      const translated = await translateTurn(sessionId, text);
+      if (stillThisSession()) dispatch({ kind: "translation-arrived", index, text: translated });
     } catch (err) {
+      if (!stillThisSession()) return;
       const message = err instanceof TranslationLimitError ? TRANSLATION_LIMIT_MESSAGE : err instanceof Error ? err.message : String(err);
-      setTranslations((previous) => ({ ...previous, [index]: { state: "failed", message } }));
+      dispatch({ kind: "translation-failed", index, message });
     }
   };
 
@@ -101,7 +98,7 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
     if (!session || finishing.current) return;
     finishing.current = true;
     setPhase("ending");
-    setDraft("");
+    dispatch({ kind: "partner-draft", text: "" });
     unsettled.current = { sessionId: session.sessionId, partnerSeconds: session.partnerSeconds() };
     savePendingEnd(unsettled.current);
     session.end();
@@ -181,16 +178,15 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
     setSummary(undefined);
     setError(undefined);
     setMicBlocked(false);
-    setTurns([]);
-    setTranslations({});
+    dispatch({ kind: "reset" });
     transcriptSession.current = undefined;
-    setDraft("");
     try {
       live.current = await startSession(
         { language, level, topic },
         {
-          onPartnerDraft: setDraft,
-          onTurn: (speaker, text) => setTurns((previous) => [...previous, { speaker, text }]),
+          onRealtimeEvent: (type) => dispatch({ kind: "realtime", type }),
+          onPartnerDraft: (text) => dispatch({ kind: "partner-draft", text }),
+          onTurn: (speaker, text) => dispatch({ kind: "turn", speaker, text }),
           onError: setError,
           onDisconnected: () => {
             setError("The connection to the Partner was lost. The Session has ended.");
@@ -207,6 +203,27 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
       setPhase("setup");
     }
   };
+
+  if (phase === "live") {
+    return (
+      <div className="flex grow flex-col">
+        <LiveSession
+          language={language}
+          level={level}
+          topic={topic}
+          secondsLeft={secondsLeft}
+          state={session}
+          onToggleTranslation={(index) => void toggleTranslation(index)}
+          onEnd={() => void finish()}
+        />
+        {error && (
+          <p role="alert" className="m-0 border-t-[3px] border-line bg-card px-4 py-2 text-sm">
+            <span className="dot bad" /> {error}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   if (phase === "setup") {
     return (
@@ -243,12 +260,6 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
       <div className="session-panel p-5">
       <h2>Talk to the Partner</h2>
       {phase === "connecting" && <p>Connecting…</p>}
-      {phase === "live" && (
-        <p>
-          <b aria-label="Time left in this Session">{formatCountdown(secondsLeft)}</b> left{" "}
-          <button onClick={() => void finish()}>End</button>
-        </p>
-      )}
       {phase === "ending" && <p>Ending the Session…</p>}
       {phase === "end-failed" && (
         <p>
@@ -260,37 +271,14 @@ export function SessionPanel({ allowance, language, onLanguageChange, onSettled,
           <span className="dot bad" /> {error}
         </p>
       )}
-      {(turns.length > 0 || draft) && (
-        <ul className="transcript" aria-live="polite">
-          {turns.map((turn, i) => {
-            const translation = translations[i];
-            // Translations only work while the Session is live; after it ends the Transcript is plain text.
-            const tappable = turn.speaker === "Partner" && phase === "live";
-            return (
-              <li key={i}>
-                <b>{turn.speaker === "Partner" ? "Partner" : "You"}:</b>{" "}
-                {tappable ? (
-                  <button type="button" className="turn" onClick={() => void showTranslation(i, turn.text)}>
-                    {turn.text}
-                  </button>
-                ) : (
-                  turn.text
-                )}
-                {translation?.state === "loading" && <div className="muted">Translating…</div>}
-                {translation?.state === "done" && <div className="translation">{translation.text}</div>}
-                {translation?.state === "failed" && (
-                  <div role="alert">
-                    <span className="dot bad" /> {translation.message}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-          {draft && (
-            <li className="muted">
-              <b>Partner:</b> {draft}
+      {/* Translations only work while the Session is live; once it ends the Transcript is plain text. */}
+      {session.turns.length > 0 && (
+        <ul className="transcript">
+          {session.turns.map((turn, i) => (
+            <li key={i}>
+              <b>{turn.speaker === "Partner" ? "Partner" : "You"}:</b> {turn.text}
             </li>
-          )}
+          ))}
         </ul>
       )}
       </div>
