@@ -26,9 +26,11 @@ interface BlobProps {
   size?: number;
   /** Describes Blob to screen readers. Without it Blob is decorative and hidden from them. */
   label?: string;
+  /** Extra classes, for example `desk:w-[260px] desk:h-auto` to grow Blob on wide screens. */
+  className?: string;
 }
 
-export function Blob({ color, mood, size = 160, label }: BlobProps) {
+export function Blob({ color, mood, size = 160, label, className = "" }: BlobProps) {
   const pose = POSES[mood];
   const stroke = { stroke: INK, strokeWidth: 2.5 };
   return (
@@ -39,7 +41,7 @@ export function Blob({ color, mood, size = 160, label }: BlobProps) {
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
-      className={`blob blob--${mood}`}
+      className={`blob blob--${mood} ${className}`}
       data-mood={mood}
     >
       <g style={{ filter: "drop-shadow(6px 7px 0 rgba(20,20,20,0.28))" }}>
