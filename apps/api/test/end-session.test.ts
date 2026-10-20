@@ -1,4 +1,4 @@
-import { DeleteCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { EndSessionResponse } from "@immersr/shared";
 import { endSession } from "../src/routes/end-session.ts";
@@ -18,7 +18,7 @@ describe("POST /api/sessions/{id}/end", () => {
     }
   });
 
-  const valid = { sdpOffer: "v=0 offer", language: "pt-PT", level: "A2", topic: "my weekend" };
+  const valid = { sdpOffer: "v=0 offer", language: "pt-PT", level: "beginner", topic: "my weekend" };
   const item = async (PK: string, SK: string) =>
     (await testDb.send(new GetCommand({ TableName: table.tableName, Key: { PK, SK } }))).Item;
 
@@ -63,6 +63,25 @@ describe("POST /api/sessions/{id}/end", () => {
       chargedSeconds: 300,
       endedAt: "2026-10-19T12:05:00.000Z",
     });
+  });
+
+  it.each(["A1", "A2", "B1", "B2"])("still ends and reads a Session stored before the Level bands changed (%s)", async (level) => {
+    const sub = `old-${level}`;
+    const { sessionId, end } = await start(sub);
+    await testDb.send(
+      new UpdateCommand({
+        TableName: table.tableName,
+        Key: { PK: `LEARNER#${sub}`, SK: `SESSION#${sessionId}` },
+        UpdateExpression: "SET #level = :level",
+        ExpressionAttributeNames: { "#level": "level" },
+        ExpressionAttributeValues: { ":level": level },
+      }),
+    );
+
+    const response = await end(60);
+
+    expect(response.statusCode).toBe(200);
+    expect(await item(`LEARNER#${sub}`, `SESSION#${sessionId}`)).toMatchObject({ level, status: "ended" });
   });
 
   it("hangs up before settling: a failed hang-up gives 502, leaves the Session active, and a retry settles", async () => {

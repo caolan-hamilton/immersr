@@ -27,9 +27,33 @@ export const LANGUAGES = ["pt-PT", "es-ES", "fr-FR"] as const;
 export const Language = z.enum(LANGUAGES);
 export type Language = z.infer<typeof Language>;
 
-export const LEVELS = ["A1", "A2", "B1", "B2"] as const;
+export const LEVELS = ["superbeginner", "beginner", "intermediate"] as const;
 export const Level = z.enum(LEVELS);
 export type Level = z.infer<typeof Level>;
+
+export const LEVEL_NAMES: Record<Level, string> = {
+  superbeginner: "Superbeginner",
+  beginner: "Beginner",
+  intermediate: "Intermediate",
+};
+
+export const LEVEL_HINTS: Record<Level, string> = {
+  superbeginner: "Just starting: very slow, very simple",
+  beginner: "Can follow simple, slow speech",
+  intermediate: "Can follow everyday conversation",
+};
+
+/**
+ * Reads a Level stored before the bands changed (A1–B2), or an unknown one. Old Session items and
+ * remembered device choices keep their old strings, so anything that reads one goes through here.
+ */
+export function levelFromStored(stored: string | null | undefined): Level {
+  const current = LEVELS.find((level) => level === stored);
+  if (current) return current;
+  if (stored === "A1") return "beginner";
+  if (stored === "A2" || stored === "B1" || stored === "B2") return "intermediate";
+  return "superbeginner";
+}
 
 export const TOPIC_MAX_LENGTH = 150;
 

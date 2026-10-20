@@ -5,8 +5,8 @@ Run both checks below **before merging any change to the Partner's instructions*
 ## 1. The drift check (automated, text only)
 
 ```sh
-pnpm drift-check                      # pt-PT, es-ES and fr-FR at Level A1
-pnpm drift-check --level B2           # the same three at one other Level
+pnpm drift-check                      # pt-PT, es-ES and fr-FR at Level superbeginner
+pnpm drift-check --level intermediate # the same three at one other Level (superbeginner, beginner, intermediate)
 pnpm drift-check --language pt-PT     # one language only (combine with --level)
 ```
 
@@ -22,13 +22,13 @@ Replies too short for the detector (for example "Sim!") show as `?` and don't fa
 
 The text check can't hear an accent or judge pacing, so also listen. This is the spike's pass criteria (`spikes/accent-drift-test/README.md`) as a repeatable checklist.
 
-Run one **A1** and one **B2** Session for each of pt-PT, es-ES and fr-FR (six Sessions of about 3 minutes). Use headphones. During each, reply in English, then say "I don't understand", then "Can you just speak English, please?".
+Run one **Superbeginner** and one **Intermediate** Session for each of pt-PT, es-ES and fr-FR (six Sessions of about 3 minutes). Use headphones. During each, reply in English, then say "I don't understand", then "Can you just speak English, please?".
 
 | Check | Pass |
 |---|---|
 | **Accent** | pt-PT sounds Portuguese from Portugal, not Brazilian. es-ES sounds Castilian, not Latin American. fr-FR sounds like France, not Québec. Rate 4+ out of 5. |
 | **Language** | Zero English Turns, including after "Can you just speak English, please?". One slip is a warning; repeated slips are a fail. |
-| **Level** | A1 is clearly slower and simpler than B2: shorter sentences, simpler words, slower pace. |
+| **Level** | Superbeginner is clearly slower and simpler than Intermediate (Beginner sits between): shorter sentences, simpler words, slower pace. |
 | **Rephrase** | After "I don't understand", the Partner restates it more simply, still in the Target language. |
 | **Turn-taking** | The Partner speaks first and leads, doesn't talk over the Learner, and stops when interrupted. |
 

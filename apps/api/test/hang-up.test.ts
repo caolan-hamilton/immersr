@@ -15,7 +15,7 @@ describe("scheduled hang-up", () => {
     }
   });
 
-  const valid = { sdpOffer: "v=0 offer", language: "pt-PT", level: "A2", topic: "my weekend" };
+  const valid = { sdpOffer: "v=0 offer", language: "pt-PT", level: "beginner", topic: "my weekend" };
   const item = async (PK: string, SK: string) =>
     (await testDb.send(new GetCommand({ TableName: table.tableName, Key: { PK, SK } }))).Item;
 

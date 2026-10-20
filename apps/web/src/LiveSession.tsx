@@ -1,4 +1,4 @@
-import type { Language, Level } from "@immersr/shared";
+import { LEVEL_NAMES, type Language, type Level } from "@immersr/shared";
 import { useEffect, useRef } from "react";
 import { Blob } from "./Blob.tsx";
 import { formatCountdown } from "./format.ts";
@@ -52,7 +52,7 @@ export function LiveSession({ language, level, topic, secondsLeft, state, onTogg
         </div>
         <div className="absolute inset-x-3.5 top-3.5 flex items-start justify-between gap-2 desk:inset-x-[18px] desk:top-[18px]">
           <span className="pill min-w-0 truncate bg-white text-[#141414]">
-            {theme.short} · {level} · {topic}
+            {theme.short} · {LEVEL_NAMES[level]} · {topic}
           </span>
           <span
             className="pill shrink-0 bg-you font-display text-base text-[#141414] desk:text-lg"
