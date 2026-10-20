@@ -33,6 +33,12 @@ flowchart LR
 
 The browser never holds an OpenAI key. It sends its WebRTC offer to the API, which reserves the Session's minutes, builds the Partner's instructions on the server and forwards the offer to OpenAI. The audio then flows directly between the browser and OpenAI.
 
+## How it's built
+
+I built this with AI coding agents, using a spec-driven workflow. Each feature starts with a "grilling" session that settles its decisions, which become a spec, ADRs and [GLOSSARY.md](GLOSSARY.md). The spec is then split into tracer-bullet tickets, each a thin end-to-end slice with acceptance criteria. Claude, running in GitHub Actions, implements a ticket with tests through the API seam (real route handlers against DynamoDB Local, with the outside world faked) and opens a pull request. CI runs the full suite on every pull request. A second Claude workflow reviews every PR against its ticket and hands "needs changes" findings back for a fix. I make the design decisions, review the PRs and decide what merges. Prod deploys from `main` through CI.
+
+**Stack:** TypeScript · React 19 · Vite · Tailwind CSS · Node.js Lambda · API Gateway · DynamoDB · Cognito · CloudFront · AWS CDK · OpenAI Realtime (WebRTC) · Amazon Translate · Vitest · GitHub Actions
+
 ## Key decisions
 
 - [0001](docs/adr/0001-openai-realtime-mini-over-webrtc.md): OpenAI `gpt-realtime-2.1-mini` over WebRTC as the voice provider, not Gemini Live or Nova Sonic
@@ -42,12 +48,6 @@ The browser never holds an OpenAI key. It sends its WebRTC offer to the API, whi
 - [0005](docs/adr/0005-openai-standard-api-without-eu-residency.md): OpenAI's standard API, not EU data residency, for the MVP
 - [0006](docs/adr/0006-single-table-keyed-by-learner.md): One DynamoDB table keyed by Learner
 - [0007](docs/adr/0007-account-erasure-may-reset-the-daily-allowance.md): Account erasure may reset the Daily allowance, which is an accepted gap
-
-## How it's built
-
-I built this with AI coding agents, using a spec-driven workflow. Each feature starts with a "grilling" session that settles its decisions, which become a spec, ADRs and [GLOSSARY.md](GLOSSARY.md). The spec is then split into tracer-bullet tickets, each a thin end-to-end slice with acceptance criteria. Claude, running in GitHub Actions, implements a ticket with tests through the API seam (real route handlers against DynamoDB Local, with the outside world faked) and opens a pull request. CI runs the full suite on every pull request. A second Claude workflow reviews every PR against its ticket and hands "needs changes" findings back for a fix. I make the design decisions, review the PRs and decide what merges. Prod deploys from `main` through CI.
-
-**Stack:** TypeScript · React 19 · Vite · Tailwind CSS · Node.js Lambda · API Gateway · DynamoDB · Cognito · CloudFront · AWS CDK · OpenAI Realtime (WebRTC) · Amazon Translate · Vitest · GitHub Actions
 
 ---
 
