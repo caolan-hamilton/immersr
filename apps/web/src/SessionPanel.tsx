@@ -208,7 +208,7 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
     dispatch({ kind: "reset" });
     transcriptSession.current = undefined;
     try {
-      live.current = await startSession(
+      const started = await startSession(
         { language, level, topic },
         {
           onRealtimeEvent: (type) => dispatch({ kind: "realtime", type }),
@@ -223,8 +223,6 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
       );
       if (cancelled()) {
         // Cancelled while connecting: the server may already hold a Reservation, so hang up and settle it quietly.
-        const started = live.current;
-        live.current = undefined;
         const pending = { sessionId: started.sessionId, partnerSeconds: 0 };
         unsettled.current = pending;
         savePendingEnd(pending);
@@ -238,7 +236,8 @@ export function SessionPanel({ allowance, immersion, language, onLanguageChange,
         );
         return;
       }
-      transcriptSession.current = live.current.sessionId;
+      live.current = started;
+      transcriptSession.current = started.sessionId;
       setPhase("live");
     } catch (err) {
       if (cancelled()) return;
