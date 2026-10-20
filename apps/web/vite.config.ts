@@ -41,9 +41,22 @@ export default defineConfig({
         runtimeCaching: [
           { urlPattern: ({ url }) => url.pathname.startsWith("/api/"), handler: "NetworkOnly" },
           {
-            urlPattern: ({ request, url }) => request.mode === "navigate" || url.pathname === "/config.json",
+            urlPattern: ({ request }) => request.mode === "navigate",
             handler: "NetworkFirst",
-            options: { cacheName: "shell-network-first", networkTimeoutSeconds: 4 },
+            options: {
+              cacheName: "shell-network-first",
+              networkTimeoutSeconds: 4,
+              plugins: [
+                // Every navigation (deep links, the Cognito `/?code=…` redirect) shares one cached shell, so a cold
+                // start offline at any URL finds it and one-time codes are never stored as separate entries.
+                { cacheKeyWillBeUsed: async () => "/index.html" },
+              ],
+            },
+          },
+          {
+            urlPattern: ({ url }) => url.pathname === "/config.json",
+            handler: "NetworkFirst",
+            options: { cacheName: "config-network-first", networkTimeoutSeconds: 4 },
           },
           {
             urlPattern: ({ url }) => url.origin === "https://fonts.googleapis.com" || url.origin === "https://fonts.gstatic.com",

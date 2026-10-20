@@ -51,17 +51,13 @@ export function App() {
 
   // A live Session keeps its own screen even if the connection blips; everywhere else offline gets the friendly screen.
   const online = useOnline();
-  if (!online && !(state.kind === "home" && screen === "session")) {
-    return (
-      <div style={themeVars(theme)}>
-        <Offline color={theme.body} />
-      </div>
-    );
-  }
+  const offlineScreen = !online && !(state.kind === "home" && screen === "session");
 
   return (
     <div style={themeVars(theme)} className="min-h-dvh bg-bg font-sans text-ink">
-      <main className="flex min-h-dvh w-full flex-col bg-bg">
+      {/* Offline hides the app rather than replacing it, so SessionPanel keeps its in-memory Session state. */}
+      {offlineScreen && <Offline color={theme.body} />}
+      <main className={offlineScreen ? "hidden" : "flex min-h-dvh w-full flex-col bg-bg"}>
         {state.kind === "home" && screen !== "session" && <TopBar current={screen === "privacy" ? "account" : screen} go={setScreen} streak={state.me.streak} />}
         <div aria-live="polite" className="flex grow flex-col">
           {state.kind === "loading" && <AppLoader color={theme.body} />}
