@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/caolan-hamilton/immersr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/caolan-hamilton/immersr/actions/workflows/ci.yml)
 
+![Immersr: Home, Setup, a live Session and the Summary, in Spanish, Portuguese and French](docs/images/immersr-banner.png)
+
 Immersr is a language-immersion web app: you hold a live voice conversation with an AI Partner in European Portuguese, Castilian Spanish or French.
 It uses crosstalk: the Partner speaks only the language you're learning and you reply in English, so you build listening comprehension without the pressure of speaking.
 
