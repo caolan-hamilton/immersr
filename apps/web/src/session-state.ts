@@ -11,14 +11,19 @@ export type PartnerState = "speaking" | "listening" | "thinking";
 export const PARTNER_STATE_BY_REALTIME_EVENT: Readonly<Record<string, PartnerState>> = {
   // Partner audio starts playing.
   "output_audio_buffer.started": "speaking",
-  // Partner audio stops (finished, or cut off by the Learner talking over it), or a response finishes.
+  // Partner audio stops (finished, or cut off by the Learner talking over it).
   "output_audio_buffer.stopped": "listening",
   "output_audio_buffer.cleared": "listening",
+  // A response finishes. Audio is generated faster than it plays, so this usually arrives mid-speech:
+  // see `YIELDS_TO_SPEAKING`.
   "response.done": "listening",
   // The Learner starts speaking: it's their turn. When they stop, a reply is coming.
   "input_audio_buffer.speech_started": "listening",
   "input_audio_buffer.speech_stopped": "thinking",
 };
+
+/** Events that must not end Speaking: playback finishing (`output_audio_buffer.stopped`) does that instead. */
+const YIELDS_TO_SPEAKING: ReadonlySet<string> = new Set(["response.done"]);
 
 export interface Turn {
   speaker: TurnSpeaker;
@@ -66,7 +71,9 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
       return initialSessionState;
     case "realtime": {
       const partner = PARTNER_STATE_BY_REALTIME_EVENT[event.type];
-      return partner && partner !== state.partner ? { ...state, partner } : state;
+      if (!partner || partner === state.partner) return state;
+      if (state.partner === "speaking" && YIELDS_TO_SPEAKING.has(event.type)) return state;
+      return { ...state, partner };
     }
     case "partner-draft":
       return { ...state, draft: event.text };

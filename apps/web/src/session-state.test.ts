@@ -13,7 +13,6 @@ describe("Partner state", () => {
     ["output_audio_buffer.started", "speaking"],
     ["output_audio_buffer.stopped", "listening"],
     ["output_audio_buffer.cleared", "listening"],
-    ["response.done", "listening"],
     ["input_audio_buffer.speech_started", "listening"],
     ["input_audio_buffer.speech_stopped", "thinking"],
   ] as const)("%s → %s", (type, expected) => {
@@ -25,6 +24,16 @@ describe("Partner state", () => {
     const types = ["input_audio_buffer.speech_started", "input_audio_buffer.speech_stopped", "output_audio_buffer.started"];
     const states = types.map((_, i) => run(types.slice(0, i + 1).map(realtime)).partner);
     expect(states).toEqual(["listening", "thinking", "speaking"]);
+  });
+
+  it("keeps speaking when the response finishes before its audio has played out", () => {
+    const types = ["output_audio_buffer.started", "response.done"];
+    expect(run(types.map(realtime)).partner).toBe("speaking");
+    expect(run([...types, "output_audio_buffer.stopped"].map(realtime)).partner).toBe("listening");
+  });
+
+  it("goes to listening on response.done when no audio is playing", () => {
+    expect(run([realtime("response.done")]).partner).toBe("listening");
   });
 
   it("stays thinking after the Learner stops until Partner audio starts", () => {
