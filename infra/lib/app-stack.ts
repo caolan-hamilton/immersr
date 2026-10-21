@@ -88,6 +88,8 @@ export class AppStack extends Stack {
       assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com"),
     });
     hangUpFn.grantInvoke(schedulerRole);
+    // #12: Sessions are open to every signed-in Learner, within their Daily allowance and the global daily cap.
+    sessionsFn.addEnvironment("SESSIONS_OPEN_TO_ALL", "true");
     sessionsFn.addEnvironment("SCHEDULE_GROUP_NAME", scheduleGroup.ref);
     sessionsFn.addEnvironment("HANGUP_FUNCTION_ARN", hangUpFn.functionArn);
     sessionsFn.addEnvironment("SCHEDULER_ROLE_ARN", schedulerRole.roleArn);

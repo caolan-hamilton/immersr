@@ -7,7 +7,7 @@ export interface Deps {
   tableName: string;
   stage: string;
   world: OutsideWorld;
-  /** Sessions are admins-only until #12 opens Immersr to all Learners by setting SESSIONS_OPEN_TO_ALL=true. */
+  /** Sessions were admins-only until #12 opened Immersr to all Learners (the stack sets SESSIONS_OPEN_TO_ALL=true). */
   sessionsAdminsOnly: boolean;
 }
 

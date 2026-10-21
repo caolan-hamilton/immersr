@@ -17,7 +17,7 @@ export const createSession =
     const caller = callerOf(event);
     const { sub, isAdmin } = caller;
 
-    // Sessions are admins-only until #12 opens Immersr to all Learners (see Deps.sessionsAdminsOnly).
+    // Off in deployed stacks since #12 opened Sessions to all Learners; kept so tests can cover both (Deps.sessionsAdminsOnly).
     // Checked first, so a refused caller triggers no moderation call, Reservation or OpenAI call.
     if (deps.sessionsAdminsOnly && !isAdmin) {
       return json(403, { error: "Sessions aren't open to everyone yet." });
